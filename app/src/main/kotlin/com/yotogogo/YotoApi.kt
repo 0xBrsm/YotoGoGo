@@ -36,7 +36,7 @@ class YotoApi {
         val body = FormBody.Builder()
             .add("client_id", CLIENT_ID)
             .add("audience", API_BASE)
-            .add("scope", "offline_access")
+            .add("scope", "family:library:view offline_access")
             .build()
 
         val req = Request.Builder().url(AUTH_URL).post(body).build()
