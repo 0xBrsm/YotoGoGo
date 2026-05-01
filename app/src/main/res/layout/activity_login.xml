@@ -59,12 +59,22 @@
             android:textSize="16sp"
             android:textColor="#0066CC"
             android:layout_marginTop="4dp"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="8dp"
+            android:autoLink="web"
+            android:linksClickable="true" />
+
+        <Button
+            android:id="@+id/btnOpenBrowser"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Open in Browser"
+            android:layout_marginBottom="16dp"
+            style="@style/Widget.Material3.Button.OutlinedButton" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="2. Enter this code:"
+            android:text="2. Enter this code (tap to copy):"
             android:textStyle="bold" />
 
         <TextView
@@ -74,7 +84,8 @@
             android:textSize="32sp"
             android:textStyle="bold"
             android:letterSpacing="0.15"
-            android:layout_marginTop="4dp" />
+            android:layout_marginTop="4dp"
+            android:textIsSelectable="true" />
 
         <TextView
             android:layout_width="match_parent"

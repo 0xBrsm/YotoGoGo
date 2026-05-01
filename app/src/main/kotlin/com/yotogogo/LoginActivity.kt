@@ -1,8 +1,13 @@
 package com.yotogogo
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.yotogogo.databinding.ActivityLoginBinding
@@ -31,10 +36,18 @@ class LoginActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching { api.requestDeviceCode() }
                 .onSuccess { codes ->
-                    // Show user the code and URL to visit
                     binding.tvCode.text = codes.userCode
                     binding.tvUrl.text = codes.verificationUri
                     binding.layoutCode.visibility = View.VISIBLE
+
+                    binding.btnOpenBrowser.setOnClickListener {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(codes.verificationUri)))
+                    }
+                    binding.tvCode.setOnClickListener {
+                        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("Yoto code", codes.userCode))
+                        Toast.makeText(this, "Code copied", Toast.LENGTH_SHORT).show()
+                    }
 
                     // Poll in the background until authorized
                     runCatching { api.pollForToken(codes) }
