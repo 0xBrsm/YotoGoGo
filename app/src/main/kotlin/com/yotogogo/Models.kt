@@ -1,23 +1,22 @@
-package com.yotodl
+package com.yotogogo
 
 import com.google.gson.annotations.SerializedName
 
-data class FirebaseAuthResponse(
-    @SerializedName("idToken") val idToken: String?,
-    @SerializedName("error") val error: FirebaseError?
+data class DeviceCodeResponse(
+    @SerializedName("device_code") val deviceCode: String,
+    @SerializedName("user_code") val userCode: String,
+    @SerializedName("verification_uri") val verificationUri: String,
+    @SerializedName("verification_uri_complete") val verificationUriComplete: String?,
+    @SerializedName("expires_in") val expiresIn: Int,
+    @SerializedName("interval") val interval: Int
 )
 
-data class FirebaseError(
-    @SerializedName("message") val message: String?
+data class TokenResponse(
+    @SerializedName("access_token") val accessToken: String?,
+    @SerializedName("refresh_token") val refreshToken: String?,
+    @SerializedName("token_type") val tokenType: String?,
+    @SerializedName("error") val error: String?
 )
-
-data class YotoAuthResponse(
-    // Yoto may return the token under either key
-    @SerializedName("token") val token: String?,
-    @SerializedName("authToken") val authToken: String?
-) {
-    fun resolvedToken() = token ?: authToken
-}
 
 data class CardResponse(
     @SerializedName("card") val card: YotoCard?
@@ -41,13 +40,13 @@ data class Chapter(
 )
 
 data class Track(
-    @SerializedName("key") val key: String?,
+    @SerializedName("trackUrl") val trackUrl: String?,
     @SerializedName("title") val title: String?,
     @SerializedName("format") val format: String?,
-    @SerializedName("duration") val duration: Double?
+    @SerializedName("duration") val duration: Double?,
+    @SerializedName("fileSize") val fileSize: Long?
 )
 
-// Flat list item used by the RecyclerView
 data class TrackItem(
     val chapterTitle: String,
     val trackIndex: Int,

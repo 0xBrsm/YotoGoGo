@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "YotoDownloader"
+rootProject.name = "YotoGoGo"
 include(":app")

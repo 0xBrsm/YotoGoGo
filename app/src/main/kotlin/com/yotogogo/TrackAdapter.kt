@@ -1,9 +1,9 @@
-package com.yotodl
+package com.yotogogo
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.yotodl.databinding.ItemTrackBinding
+import com.yotogogo.databinding.ItemTrackBinding
 
 class TrackAdapter(private val items: List<TrackItem>) :
     RecyclerView.Adapter<TrackAdapter.VH>() {
@@ -19,10 +19,10 @@ class TrackAdapter(private val items: List<TrackItem>) :
         val item = items[position]
         holder.binding.tvTrackName.text = item.filename
         holder.binding.tvStatus.text = when (item.status) {
-            DownloadStatus.PENDING -> ""
+            DownloadStatus.PENDING     -> ""
             DownloadStatus.DOWNLOADING -> "⬇ downloading…"
-            DownloadStatus.DONE -> "✓ saved"
-            DownloadStatus.ERROR -> "✗ error"
+            DownloadStatus.DONE        -> "✓ saved"
+            DownloadStatus.ERROR       -> "✗ error"
         }
     }
 

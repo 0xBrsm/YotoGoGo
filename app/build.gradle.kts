@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.yotodl"
+    namespace = "com.yotogogo"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.yotodl"
+        applicationId = "com.yotogogo"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

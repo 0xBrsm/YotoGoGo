@@ -1,8 +1,9 @@
-package com.yotodl
+package com.yotogogo
 
 import android.app.PendingIntent
 import android.content.Intent
 import android.nfc.NfcAdapter
+import android.nfc.NdefRecord
 import android.nfc.Tag
 import android.nfc.tech.Ndef
 import android.os.Bundle
@@ -10,7 +11,7 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.yotodl.databinding.ActivityMainBinding
+import com.yotogogo.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -24,7 +25,7 @@ class MainActivity : AppCompatActivity() {
     private var nfcAdapter: NfcAdapter? = null
     private val api = YotoApi()
     private var currentTracks: List<TrackItem> = emptyList()
-    private var adapter: TrackAdapter? = null
+    private var trackAdapter: TrackAdapter? = null
     private var cardTitle = "Yoto Card"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,13 +43,11 @@ class MainActivity : AppCompatActivity() {
         binding.btnDownloadAll.setOnClickListener { downloadAll() }
         binding.btnLogout.setOnClickListener { logout() }
 
-        // Handle tap if app was launched via NFC
         handleNfcIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        // Intercept NFC while this activity is in the foreground
         nfcAdapter?.enableForegroundDispatch(
             this,
             PendingIntent.getActivity(
@@ -82,7 +81,7 @@ class MainActivity : AppCompatActivity() {
         val slug = readSlugFromTag(tag)
 
         if (slug == null) {
-            binding.tvStatus.text = "Could not read card slug. Raw tag: ${tag.id.toHex()}"
+            binding.tvStatus.text = "Could not read card. Raw tag ID: ${tag.id.toHex()}"
             return
         }
 
@@ -93,22 +92,19 @@ class MainActivity : AppCompatActivity() {
         val ndef = Ndef.get(tag) ?: return null
         return try {
             ndef.connect()
-            val message = ndef.ndefMessage ?: return null
+            val message = ndef.ndefMessage
             ndef.close()
 
-            for (record in message.records) {
-                val payload = record.payload
-                // URI records: first byte is the URI prefix code
-                if (record.tnf == android.nfc.NdefRecord.TNF_WELL_KNOWN &&
-                    record.type.contentEquals(android.nfc.NdefRecord.RTD_URI)
+            message?.records?.firstNotNullOfOrNull { record ->
+                if (record.tnf == NdefRecord.TNF_WELL_KNOWN &&
+                    record.type.contentEquals(NdefRecord.RTD_URI)
                 ) {
-                    val uriField = String(payload.drop(1).toByteArray())
-                    val fullUri = uriPrefixFor(payload[0]) + uriField
-                    binding.tvStatus.text = "Read URI: $fullUri"
-                    return extractSlug(fullUri)
-                }
+                    val payload = record.payload
+                    val uri = uriPrefixFor(payload[0]) + String(payload.drop(1).toByteArray())
+                    binding.tvStatus.text = "Read: $uri"
+                    extractSlug(uri)
+                } else null
             }
-            null
         } catch (e: Exception) {
             binding.tvStatus.text = "NFC read error: ${e.message}"
             null
@@ -116,18 +112,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extractSlug(uri: String): String? {
-        // Handle https://yoto.io/{slug}
-        val yotoPrefix = "https://yoto.io/"
-        if (uri.startsWith(yotoPrefix)) {
-            return uri.removePrefix(yotoPrefix).trimEnd('/')
+        if (uri.startsWith("https://yoto.io/") || uri.startsWith("https://yotoplay.com/")) {
+            return uri.substringAfterLast('/').takeIf { it.isNotBlank() }
         }
-        // Handle yoto://play/{slug} or similar custom schemes
-        val customPrefix = Regex("^yoto://[^/]+/(.+)$")
-        customPrefix.find(uri)?.let { return it.groupValues[1].trimEnd('/') }
-
-        // Last resort: use the last path segment
-        return uri.trimEnd('/').substringAfterLast('/')
-            .takeIf { it.isNotBlank() }
+        Regex("^yoto://[^/]+/(.+)$").find(uri)?.let {
+            return it.groupValues[1].trimEnd('/')
+        }
+        return uri.trimEnd('/').substringAfterLast('/').takeIf { it.isNotBlank() }
     }
 
     private fun uriPrefixFor(code: Byte): String = when (code.toInt()) {
@@ -139,12 +130,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun fetchCard(slug: String) {
-        val token = authToken() ?: run {
-            logout(); return
-        }
+        val token = authToken() ?: run { logout(); return }
 
         setLoading(true)
-        binding.tvStatus.text = "Fetching card: $slug"
+        binding.tvStatus.text = "Fetching: $slug…"
         binding.btnDownloadAll.visibility = View.GONE
 
         lifecycleScope.launch {
@@ -153,36 +142,30 @@ class MainActivity : AppCompatActivity() {
                     cardTitle = card.title ?: slug
                     binding.tvCardTitle.text = cardTitle
                     currentTracks = api.buildTrackList(card)
-                    adapter = TrackAdapter(currentTracks)
-                    binding.rvTracks.adapter = adapter
-                    binding.tvStatus.text = "${currentTracks.size} track(s) found"
+                    trackAdapter = TrackAdapter(currentTracks)
+                    binding.rvTracks.adapter = trackAdapter
+                    binding.tvStatus.text = "${currentTracks.size} track(s) — tap Download to save"
                     binding.btnDownloadAll.visibility =
                         if (currentTracks.isNotEmpty()) View.VISIBLE else View.GONE
                 }
-                .onFailure { e ->
-                    binding.tvStatus.text = "Error: ${e.message}"
-                }
+                .onFailure { e -> binding.tvStatus.text = "Error: ${e.message}" }
             setLoading(false)
         }
     }
 
     private fun downloadAll() {
-        val token = authToken() ?: run { logout(); return }
         binding.btnDownloadAll.isEnabled = false
-
         val destDir = resolveDestDir(cardTitle)
         binding.tvStatus.text = "Saving to: ${destDir.absolutePath}"
 
         lifecycleScope.launch {
             val httpClient = OkHttpClient()
             currentTracks.forEachIndexed { i, track ->
-                adapter?.updateStatus(i, DownloadStatus.DOWNLOADING)
+                trackAdapter?.updateStatus(i, DownloadStatus.DOWNLOADING)
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        val req = Request.Builder()
-                            .url(track.url)
-                            .header("Authorization", "Bearer $token")
-                            .build()
+                        // CDN URLs are pre-signed — no auth header needed
+                        val req = Request.Builder().url(track.url).build()
                         httpClient.newCall(req).execute().use { resp ->
                             if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
                             val file = File(destDir, track.filename)
@@ -192,26 +175,22 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }.onSuccess {
-                    adapter?.updateStatus(i, DownloadStatus.DONE)
-                }.onFailure { e ->
-                    adapter?.updateStatus(i, DownloadStatus.ERROR)
-                    track.filename  // keep going on errors
+                    trackAdapter?.updateStatus(i, DownloadStatus.DONE)
+                }.onFailure {
+                    trackAdapter?.updateStatus(i, DownloadStatus.ERROR)
                 }
             }
             val done = currentTracks.count { it.status == DownloadStatus.DONE }
-            binding.tvStatus.text = "Done — $done/${currentTracks.size} tracks saved to ${destDir.absolutePath}"
+            binding.tvStatus.text = "$done/${currentTracks.size} tracks saved to ${destDir.absolutePath}"
             binding.btnDownloadAll.isEnabled = true
         }
     }
 
     private fun resolveDestDir(title: String): File {
-        // Prefer SD card (index 1+), fall back to internal app storage
         val externalDirs = getExternalFilesDirs(null)
         val base = if (externalDirs.size > 1) externalDirs[1] else externalDirs[0]
         val safe = title.replace(Regex("[^A-Za-z0-9 _-]"), "").trim()
-        val dir = File(base, "Yoto/$safe")
-        dir.mkdirs()
-        return dir
+        return File(base, "Yoto GoGo/$safe").also { it.mkdirs() }
     }
 
     private fun setLoading(loading: Boolean) {
