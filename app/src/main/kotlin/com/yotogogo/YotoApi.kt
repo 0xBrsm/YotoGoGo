@@ -20,7 +20,7 @@ class YotoApi {
 
     companion object {
         // Register a free OAuth app at https://yoto.dev/get-started/start-here/ to get your CLIENT_ID
-        const val CLIENT_ID = "REDACTED"
+        val CLIENT_ID get() = BuildConfig.YOTO_CLIENT_ID
 
         private const val AUTH_URL  = "https://login.yotoplay.com/oauth/device/code"
         private const val TOKEN_URL = "https://login.yotoplay.com/oauth/token"

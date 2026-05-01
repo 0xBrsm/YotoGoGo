@@ -13,9 +13,14 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        buildConfigField(
+            "String", "YOTO_CLIENT_ID",
+            "\"${System.getenv("YOTO_CLIENT_ID") ?: ""}\""
+        )
     }
 
     buildFeatures {
+        buildConfig = true
         viewBinding = true
     }
 
