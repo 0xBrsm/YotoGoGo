@@ -20,7 +20,7 @@ class YotoApi {
 
     companion object {
         // Register a free OAuth app at https://yoto.dev/get-started/start-here/ to get your CLIENT_ID
-        const val CLIENT_ID = "YOUR_CLIENT_ID_HERE"
+        const val CLIENT_ID = "REDACTED"
 
         private const val AUTH_URL  = "https://login.yotoplay.com/oauth/device/code"
         private const val TOKEN_URL = "https://login.yotoplay.com/oauth/token"
@@ -36,7 +36,7 @@ class YotoApi {
         val body = FormBody.Builder()
             .add("client_id", CLIENT_ID)
             .add("audience", API_BASE)
-            .add("scope", "family:library:view offline_access")
+            .add("scope", "family:library:view user:content:view offline_access")
             .build()
 
         val req = Request.Builder().url(AUTH_URL).post(body).build()
