@@ -46,7 +46,7 @@ class LoginActivity : AppCompatActivity() {
                     binding.tvCode.setOnClickListener {
                         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(ClipData.newPlainText("Yoto code", codes.userCode))
-                        Toast.makeText(this, "Code copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@LoginActivity, "Code copied", Toast.LENGTH_SHORT).show()
                     }
 
                     // Poll in the background until authorized
