@@ -30,7 +30,7 @@ def load_token_from_app():
     prefs_path = f"/data/data/{APP_ID}/shared_prefs/yoto.xml"
     try:
         result = subprocess.run(
-            ["run-as", APP_ID, "cat", prefs_path],
+            ["/system/bin/run-as", APP_ID, "cat", prefs_path],
             capture_output=True, text=True, check=True
         )
         xml = result.stdout
