@@ -6,7 +6,7 @@ import android.os.Environment
 import android.provider.MediaStore
 
 fun exportTokenForScript(context: Context, token: String) {
-    val filename = ".yoto_token"
+    val filename = "yoto_token.txt"
     val resolver = context.contentResolver
     val col = MediaStore.Downloads._ID
     resolver.query(

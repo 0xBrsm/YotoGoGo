@@ -73,7 +73,8 @@ class MainActivity : AppCompatActivity() {
                 .onSuccess { cards ->
                     binding.tvLibraryStatus.visibility = View.GONE
                     binding.rvLibrary.adapter = LibraryAdapter(cards) { card ->
-                        openCard(card.slug ?: return@LibraryAdapter, card.title ?: card.slug ?: "")
+                        val id = card.slug ?: card.cardId ?: return@LibraryAdapter
+                        openCard(id, card.title ?: id)
                     }
                 }
                 .onFailure { e ->

@@ -121,9 +121,6 @@ class YotoApi {
             }
 
             response.cards?.forEach { add(it) }
-            response.playlists?.forEach { playlist ->
-                playlist.cards?.forEach { add(it) }
-            }
 
             all.sortedBy { it.title?.lowercase() ?: "" }
         }

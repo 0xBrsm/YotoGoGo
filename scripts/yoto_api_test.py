@@ -16,7 +16,7 @@ import os
 import requests
 
 API_BASE   = "https://api.yotoplay.com"
-TOKEN_FILE = os.path.expanduser("~/storage/downloads/.yoto_token")
+TOKEN_FILE = os.path.expanduser("~/storage/downloads/yoto_token.txt")
 
 HEADERS = {
     "User-Agent": "Yoto/2.73 (com.yotoplay.Yoto; build:10405; iOS 17.4.0) Alamofire/5.6.4",

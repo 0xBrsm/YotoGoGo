@@ -14,17 +14,12 @@ data class CardResponse(
 )
 
 data class LibraryResponse(
-    @SerializedName("cards") val cards: List<LibraryEntry>?,
-    @SerializedName("playlists") val playlists: List<PlaylistEntry>?
+    @SerializedName("cards") val cards: List<LibraryEntry>?
 )
 
 data class LibraryEntry(
     @SerializedName("cardId") val cardId: String?,
     @SerializedName("card") val card: YotoCard?
-)
-
-data class PlaylistEntry(
-    @SerializedName("cards") val cards: List<LibraryEntry>?
 )
 
 data class YotoCard(
