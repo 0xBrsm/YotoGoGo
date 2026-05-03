@@ -66,7 +66,8 @@ data class Track(
     @SerializedName("title") val title: String?,
     @SerializedName("format") val format: String?,
     @SerializedName("duration") val duration: Double?,
-    @SerializedName("fileSize") val fileSize: Long?
+    @SerializedName("fileSize") val fileSize: Long?,
+    @SerializedName("display") val display: ChapterDisplay?
 )
 
 data class TrackItem(
