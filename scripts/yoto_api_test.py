@@ -16,11 +16,14 @@ import base64
 import hashlib
 import http.server
 import json
+import os
 import secrets
 import threading
 import urllib.parse
 import webbrowser
 import requests
+
+TOKEN_FILE = os.path.expanduser("~/.yoto_token")
 
 CLIENT_ID    = "Ui8g0T3UR0CIsZJMhHpzouU8dfAm4ZEK"
 REDIRECT_URI = "http://localhost:8765/callback"
@@ -166,11 +169,21 @@ def probe_card(token, slug, query=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--token", help="Skip auth and use this token")
+    parser.add_argument("--reauth", action="store_true", help="Force fresh login")
     parser.add_argument("slug", nargs="?", help="Card slug to fetch")
     parser.add_argument("query", nargs="?", help="NFC query string (e.g. key=abc123)")
     args = parser.parse_args()
 
-    token = args.token or authenticate()
+    if args.token:
+        token = args.token
+    elif not args.reauth and os.path.exists(TOKEN_FILE):
+        token = open(TOKEN_FILE).read().strip()
+        print(f"Loaded token from {TOKEN_FILE}")
+    else:
+        token = authenticate()
+        open(TOKEN_FILE, "w").write(token)
+        os.chmod(TOKEN_FILE, 0o600)
+        print(f"Token saved to {TOKEN_FILE}")
 
     if args.slug:
         probe_card(token, args.slug, args.query)
