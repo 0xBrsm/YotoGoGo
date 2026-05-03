@@ -1,11 +1,8 @@
 package com.yotogogo
 
-import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsIntent
@@ -81,7 +78,7 @@ class LoginActivity : AppCompatActivity() {
                         .putString("auth_token", token)
                         .remove("pkce_verifier")
                         .apply()
-                    saveTokenForScript(token)
+                    exportTokenForScript(this@LoginActivity, token)
                     startMain()
                 }
                 .onFailure { e -> showError(e.message ?: "Authentication failed") }
@@ -98,26 +95,6 @@ class LoginActivity : AppCompatActivity() {
     private fun setLoading(loading: Boolean) {
         binding.progress.visibility = if (loading) View.VISIBLE else View.GONE
         binding.btnConnect.isEnabled = !loading
-    }
-
-    private fun saveTokenForScript(token: String) {
-        val filename = ".yoto_token"
-        val resolver = contentResolver
-        val existing = resolver.query(
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            arrayOf(MediaStore.Downloads._ID),
-            "${MediaStore.Downloads.DISPLAY_NAME}=?", arrayOf(filename), null
-        )
-        existing?.use { if (it.moveToFirst()) resolver.delete(MediaStore.Downloads.EXTERNAL_CONTENT_URI, "${MediaStore.Downloads._ID}=?", arrayOf(it.getString(0))) }
-
-        val values = ContentValues().apply {
-            put(MediaStore.Downloads.DISPLAY_NAME, filename)
-            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
-            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-        }
-        resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)?.let { uri ->
-            resolver.openOutputStream(uri)?.use { it.write(token.toByteArray()) }
-        }
     }
 
     private fun prefs() = getSharedPreferences("yoto", MODE_PRIVATE)

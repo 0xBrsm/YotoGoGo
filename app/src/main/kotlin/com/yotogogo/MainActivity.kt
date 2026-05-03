@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         binding.rvLibrary.layoutManager = GridLayoutManager(this, LibraryAdapter.COLUMNS)
         binding.btnLogout.setOnClickListener { logout() }
 
+        authToken()?.let { exportTokenForScript(this, it) }
         loadLibrary()
         handleNfcIntent(intent)
     }
