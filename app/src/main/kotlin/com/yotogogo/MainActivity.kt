@@ -148,7 +148,7 @@ class MainActivity : AppCompatActivity() {
                     binding.btnDownloadAll.visibility =
                         if (currentTracks.isNotEmpty()) View.VISIBLE else View.GONE
                 }
-                .onFailure { e -> binding.tvStatus.text = "Error: ${e.message}" }
+                .onFailure { e -> binding.tvStatus.text = "Error fetching \"$slug\":\n${e.message}" }
             setLoading(false)
         }
     }
