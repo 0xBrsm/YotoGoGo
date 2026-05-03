@@ -45,6 +45,16 @@
         android:visibility="gone"
         android:layout_marginBottom="4dp" />
 
+    <CheckBox
+        android:id="@+id/cbSelectAll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Select all"
+        android:checked="true"
+        android:visibility="gone"
+        android:layoutDirection="rtl"
+        android:layout_marginBottom="2dp" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvTracks"
         android:layout_width="match_parent"
@@ -82,7 +92,7 @@
         android:id="@+id/btnDownloadAll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Download All"
+        android:text="Download Selected"
         android:enabled="false" />
 
 </LinearLayout>

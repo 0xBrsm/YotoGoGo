@@ -9,6 +9,8 @@ import com.yotogogo.databinding.ItemTrackBinding
 class TrackAdapter(private val items: List<TrackItem>) :
     RecyclerView.Adapter<TrackAdapter.VH>() {
 
+    private val selected = BooleanArray(items.size) { true }
+
     inner class VH(val binding: ItemTrackBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -19,6 +21,7 @@ class TrackAdapter(private val items: List<TrackItem>) :
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
         holder.binding.tvTrackName.text = item.displayTitle
+        holder.binding.cbTrack.isChecked = selected[position]
         if (item.iconUrl != null) {
             holder.binding.imgTrackIcon.load(item.iconUrl) {
                 crossfade(true)
@@ -33,7 +36,21 @@ class TrackAdapter(private val items: List<TrackItem>) :
             DownloadStatus.DONE        -> "✓"
             DownloadStatus.ERROR       -> "✗"
         }
+        holder.binding.root.setOnClickListener {
+            selected[position] = !selected[position]
+            notifyItemChanged(position)
+        }
     }
+
+    fun setAllSelected(all: Boolean) {
+        selected.fill(all)
+        notifyDataSetChanged()
+    }
+
+    fun allSelected() = selected.all { it }
+
+    fun getSelectedItems(): List<TrackItem> =
+        items.filterIndexed { i, _ -> selected[i] }
 
     fun updateStatus(index: Int, status: DownloadStatus) {
         items[index].status = status

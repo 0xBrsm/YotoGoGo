@@ -51,6 +51,9 @@ class CardActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnChooseFolder.setOnClickListener { folderPicker.launch(savedTreeUri()) }
         binding.btnDownloadAll.setOnClickListener { downloadAll() }
+        binding.cbSelectAll.setOnCheckedChangeListener { _, checked ->
+            trackAdapter?.setAllSelected(checked)
+        }
 
         savedTreeUri()?.let { updateFolderLabel(it) }
 
@@ -71,6 +74,7 @@ class CardActivity : AppCompatActivity() {
                     currentTracks = api.buildTrackList(card)
                     trackAdapter = TrackAdapter(currentTracks)
                     binding.rvTracks.adapter = trackAdapter
+                    binding.cbSelectAll.visibility = View.VISIBLE
                     binding.tvStatus.text = "${currentTracks.size} track(s)"
                     binding.btnDownloadAll.isEnabled = currentTracks.isNotEmpty()
                 }
@@ -87,6 +91,11 @@ class CardActivity : AppCompatActivity() {
     }
 
     private fun startDownload(treeUri: Uri) {
+        val tracksToDownload = trackAdapter?.getSelectedItems() ?: return
+        if (tracksToDownload.isEmpty()) {
+            binding.tvStatus.text = "No tracks selected"
+            return
+        }
         binding.btnDownloadAll.isEnabled = false
         val safe = cardTitle.replace(Regex("[^A-Za-z0-9 _-]"), "").trim()
         val rootDir = DocumentFile.fromTreeUri(this, treeUri) ?: run {
@@ -105,8 +114,9 @@ class CardActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val httpClient = OkHttpClient()
-            currentTracks.forEachIndexed { i, track ->
-                trackAdapter?.updateStatus(i, DownloadStatus.DOWNLOADING)
+            tracksToDownload.forEachIndexed { i, track ->
+                val globalIndex = currentTracks.indexOf(track)
+                if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.DOWNLOADING)
                 runCatching {
                     withContext(Dispatchers.IO) {
                         val req = Request.Builder().url(track.url).build()
@@ -122,13 +132,13 @@ class CardActivity : AppCompatActivity() {
                         }
                     }
                 }.onSuccess {
-                    trackAdapter?.updateStatus(i, DownloadStatus.DONE)
+                    if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.DONE)
                 }.onFailure {
-                    trackAdapter?.updateStatus(i, DownloadStatus.ERROR)
+                    if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.ERROR)
                 }
             }
-            val done = currentTracks.count { it.status == DownloadStatus.DONE }
-            binding.tvStatus.text = "$done/${currentTracks.size} tracks saved"
+            val done = tracksToDownload.count { it.status == DownloadStatus.DONE }
+            binding.tvStatus.text = "$done/${tracksToDownload.size} tracks saved"
             binding.btnDownloadAll.isEnabled = true
         }
     }
