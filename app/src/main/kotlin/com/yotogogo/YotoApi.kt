@@ -100,14 +100,14 @@ class YotoApi {
             val chTitle = chapter.title?.takeIf { it.isNotBlank() } ?: "Chapter ${ci + 1}"
             chapter.tracks?.forEachIndexed { ti, track ->
                 val url = track.trackUrl ?: return@forEachIndexed
-                val ext = when {
-                    track.format?.contains("mp3")  == true -> "mp3"
-                    track.format?.contains("mpeg") == true -> "mp3"
-                    track.format?.contains("m4a")  == true -> "m4a"
-                    else -> "audio"
+                val (ext, mime) = when {
+                    track.format?.contains("mp3")  == true -> "mp3" to "audio/mpeg"
+                    track.format?.contains("mpeg") == true -> "mp3" to "audio/mpeg"
+                    track.format?.contains("m4a")  == true -> "m4a" to "audio/mp4"
+                    else -> "mp3" to "audio/mpeg"
                 }
                 val safe = chTitle.replace(Regex("[^A-Za-z0-9 ]"), "").trim().replace(' ', '_')
-                items.add(TrackItem(chTitle, ti + 1, url, "%02d_%02d_%s.%s".format(ci + 1, ti + 1, safe, ext)))
+                items.add(TrackItem(chTitle, ti + 1, url, "%02d_%02d_%s.%s".format(ci + 1, ti + 1, safe, ext), mime))
             }
         }
         return items

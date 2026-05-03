@@ -54,6 +54,7 @@ data class TrackItem(
     val trackIndex: Int,
     val url: String,
     val filename: String,
+    val mimeType: String = "audio/mpeg",
     var status: DownloadStatus = DownloadStatus.PENDING
 )
 

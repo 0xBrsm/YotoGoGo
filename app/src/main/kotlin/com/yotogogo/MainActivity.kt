@@ -199,7 +199,7 @@ class MainActivity : AppCompatActivity() {
                         httpClient.newCall(req).execute().use { resp ->
                             if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
                             val existing = destDir.findFile(track.filename)
-                            val file = existing ?: destDir.createFile("audio/*", track.filename)
+                            val file = existing ?: destDir.createFile(track.mimeType, track.filename)
                                 ?: throw Exception("Could not create file")
                             contentResolver.openOutputStream(file.uri)?.use { out ->
                                 resp.body?.byteStream()?.use { it.copyTo(out) }
