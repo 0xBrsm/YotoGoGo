@@ -94,6 +94,24 @@ class YotoApi {
                 ?: throw Exception("No card in response")
         }
 
+    suspend fun getLibrary(accessToken: String): List<YotoCard> =
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder()
+                .url("$API_BASE/card/family/library")
+                .header("Authorization", "Bearer $accessToken")
+                .header("User-Agent", USER_AGENT)
+                .get().build()
+
+            val body = client.newCall(req).execute().use { resp ->
+                val text = resp.body?.string()
+                if (!resp.isSuccessful) throw Exception("Library fetch error ${resp.code}: $text")
+                text
+            } ?: throw Exception("Empty library response")
+
+            gson.fromJson(body, LibraryResponse::class.java)
+                .cards?.mapNotNull { it.card } ?: emptyList()
+        }
+
     fun buildTrackList(card: YotoCard): List<TrackItem> {
         val items = mutableListOf<TrackItem>()
         card.content?.chapters?.forEachIndexed { ci, chapter ->

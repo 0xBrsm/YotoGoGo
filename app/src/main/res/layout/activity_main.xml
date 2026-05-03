@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="8dp">
 
         <TextView
             android:layout_width="0dp"
@@ -31,9 +31,9 @@
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tap a Yoto card to begin"
-        android:textSize="16sp"
-        android:layout_marginBottom="8dp"
+        android:text="Tap a card or select from library below"
+        android:textSize="15sp"
+        android:layout_marginBottom="4dp"
         android:textIsSelectable="true" />
 
     <ProgressBar
@@ -41,54 +41,91 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:visibility="gone"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="4dp" />
 
     <TextView
         android:id="@+id/tvCardTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="18sp"
+        android:textSize="17sp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="4dp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvTracks"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginBottom="8dp" />
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:nestedScrollingEnabled="false" />
 
     <LinearLayout
+        android:id="@+id/layoutDownload"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="4dp"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:visibility="gone">
 
-        <TextView
-            android:id="@+id/tvFolderPath"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textSize="12sp"
-            android:textColor="#888888"
-            android:text="No folder selected"
-            android:maxLines="2"
-            android:ellipsize="start" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvFolderPath"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
+                android:textColor="#888888"
+                android:text="No folder selected"
+                android:maxLines="2"
+                android:ellipsize="start" />
+
+            <Button
+                android:id="@+id/btnChooseFolder"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Choose Folder"
+                style="@style/Widget.Material3.Button.TextButton" />
+        </LinearLayout>
 
         <Button
-            android:id="@+id/btnChooseFolder"
-            android:layout_width="wrap_content"
+            android:id="@+id/btnDownloadAll"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Choose Folder"
-            style="@style/Widget.Material3.Button.TextButton" />
+            android:text="Download All" />
+
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btnDownloadAll"
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#DDDDDD"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Download All"
+        android:text="Your Library"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#888888"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/tvLibraryStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#888888"
         android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLibrary"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
 </LinearLayout>

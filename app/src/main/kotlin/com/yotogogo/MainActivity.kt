@@ -56,12 +56,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.rvTracks.layoutManager = LinearLayoutManager(this)
+        binding.rvLibrary.layoutManager = LinearLayoutManager(this)
+
         binding.btnDownloadAll.setOnClickListener { downloadAll() }
         binding.btnLogout.setOnClickListener { logout() }
         binding.btnChooseFolder.setOnClickListener { folderPicker.launch(savedTreeUri()) }
 
         savedTreeUri()?.let { updateFolderLabel(it) }
 
+        loadLibrary()
         handleNfcIntent(intent)
     }
 
@@ -88,6 +91,24 @@ class MainActivity : AppCompatActivity() {
         handleNfcIntent(intent)
     }
 
+    private fun loadLibrary() {
+        val token = authToken() ?: return
+        binding.tvLibraryStatus.visibility = View.VISIBLE
+        binding.tvLibraryStatus.text = "Loading…"
+        lifecycleScope.launch {
+            runCatching { api.getLibrary(token) }
+                .onSuccess { cards ->
+                    binding.tvLibraryStatus.visibility = View.GONE
+                    binding.rvLibrary.adapter = LibraryAdapter(cards) { card ->
+                        card.slug?.let { loadCard(it, card.title ?: it) }
+                    }
+                }
+                .onFailure { e ->
+                    binding.tvLibraryStatus.text = "Library unavailable: ${e.message}"
+                }
+        }
+    }
+
     private fun handleNfcIntent(intent: Intent) {
         if (intent.action !in listOf(
                 NfcAdapter.ACTION_NDEF_DISCOVERED,
@@ -97,14 +118,12 @@ class MainActivity : AppCompatActivity() {
         ) return
 
         val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG) ?: return
-        val nfcUrl = readUrlFromTag(tag)
-
-        if (nfcUrl == null) {
+        val nfcUrl = readUrlFromTag(tag) ?: run {
             binding.tvStatus.text = "Could not read card. Raw tag ID: ${tag.id.toHex()}"
             return
         }
-
-        fetchCard(nfcUrl)
+        val slug = Uri.parse(nfcUrl).lastPathSegment ?: nfcUrl
+        loadCard(slug, slug)
     }
 
     private fun readUrlFromTag(tag: Tag): String? {
@@ -113,14 +132,12 @@ class MainActivity : AppCompatActivity() {
             ndef.connect()
             val message = ndef.ndefMessage
             ndef.close()
-
             message?.records?.firstNotNullOfOrNull { record ->
                 if (record.tnf == NdefRecord.TNF_WELL_KNOWN &&
                     record.type.contentEquals(NdefRecord.RTD_URI)
                 ) {
                     val payload = record.payload
                     val uri = uriPrefixFor(payload[0]) + String(payload.drop(1).toByteArray())
-                    binding.tvStatus.text = "Read: $uri"
                     uri.takeIf { it.isNotBlank() }
                 } else null
             }
@@ -138,27 +155,32 @@ class MainActivity : AppCompatActivity() {
         else -> ""
     }
 
-    private fun fetchCard(nfcUrl: String) {
-        val slug  = android.net.Uri.parse(nfcUrl).lastPathSegment ?: nfcUrl
+    private fun loadCard(slug: String, displayName: String) {
         val token = authToken() ?: run { logout(); return }
 
         setLoading(true)
-        binding.tvStatus.text = "Fetching: $slug…"
-        binding.btnDownloadAll.visibility = View.GONE
+        binding.tvStatus.text = "Fetching: $displayName…"
+        binding.layoutDownload.visibility = View.GONE
+        currentTracks = emptyList()
+        trackAdapter = null
+        binding.rvTracks.adapter = null
+        binding.tvCardTitle.text = ""
 
         lifecycleScope.launch {
             runCatching { api.getCard(token, slug) }
                 .onSuccess { card ->
-                    cardTitle = card.title ?: slug
+                    cardTitle = card.title ?: displayName
                     binding.tvCardTitle.text = cardTitle
                     currentTracks = api.buildTrackList(card)
                     trackAdapter = TrackAdapter(currentTracks)
                     binding.rvTracks.adapter = trackAdapter
                     binding.tvStatus.text = "${currentTracks.size} track(s) — tap Download to save"
-                    binding.btnDownloadAll.visibility =
+                    binding.layoutDownload.visibility =
                         if (currentTracks.isNotEmpty()) View.VISIBLE else View.GONE
                 }
-                .onFailure { e -> binding.tvStatus.text = "Error: ${e.message}" }
+                .onFailure { e ->
+                    binding.tvStatus.text = "Error: ${e.message}"
+                }
             setLoading(false)
         }
     }
@@ -187,7 +209,7 @@ class MainActivity : AppCompatActivity() {
             binding.btnDownloadAll.isEnabled = true
             return
         }
-        binding.tvStatus.text = "Saving to: ${destDir.uri.path}"
+        binding.tvStatus.text = "Saving to: ${destDir.uri.lastPathSegment}"
 
         lifecycleScope.launch {
             val httpClient = OkHttpClient()

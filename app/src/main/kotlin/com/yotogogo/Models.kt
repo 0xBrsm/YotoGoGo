@@ -24,6 +24,14 @@ data class CardResponse(
     @SerializedName("card") val card: YotoCard?
 )
 
+data class LibraryResponse(
+    @SerializedName("cards") val cards: List<LibraryEntry>?
+)
+
+data class LibraryEntry(
+    @SerializedName("card") val card: YotoCard?
+)
+
 data class YotoCard(
     @SerializedName("cardId") val cardId: String?,
     @SerializedName("slug") val slug: String?,
