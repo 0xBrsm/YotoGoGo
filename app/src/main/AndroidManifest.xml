@@ -54,6 +54,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".CardActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>

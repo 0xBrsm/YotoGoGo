@@ -1,0 +1,156 @@
+package com.yotogogo
+
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.view.View
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.yotogogo.databinding.ActivityCardBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+
+class CardActivity : AppCompatActivity() {
+
+    private lateinit var binding: ActivityCardBinding
+    private val api = YotoApi()
+    private var currentTracks: List<TrackItem> = emptyList()
+    private var trackAdapter: TrackAdapter? = null
+    private var cardTitle = ""
+
+    private val folderPicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            saveTreeUri(uri)
+            updateFolderLabel(uri)
+            startDownload(uri)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityCardBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        val slug = intent.getStringExtra(EXTRA_SLUG) ?: run { finish(); return }
+        val displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME) ?: slug
+
+        binding.tvCardTitle.text = displayName
+        binding.rvTracks.layoutManager = LinearLayoutManager(this)
+        binding.btnBack.setOnClickListener { finish() }
+        binding.btnChooseFolder.setOnClickListener { folderPicker.launch(savedTreeUri()) }
+        binding.btnDownloadAll.setOnClickListener { downloadAll() }
+
+        savedTreeUri()?.let { updateFolderLabel(it) }
+
+        loadCard(slug)
+    }
+
+    private fun loadCard(slug: String) {
+        val token = authToken() ?: run { finish(); return }
+        binding.tvStatus.text = "Loading…"
+        binding.progress.visibility = View.VISIBLE
+        binding.btnDownloadAll.isEnabled = false
+
+        lifecycleScope.launch {
+            runCatching { api.getCard(token, slug) }
+                .onSuccess { card ->
+                    cardTitle = card.title ?: slug
+                    binding.tvCardTitle.text = cardTitle
+                    currentTracks = api.buildTrackList(card)
+                    trackAdapter = TrackAdapter(currentTracks)
+                    binding.rvTracks.adapter = trackAdapter
+                    binding.tvStatus.text = "${currentTracks.size} track(s)"
+                    binding.btnDownloadAll.isEnabled = currentTracks.isNotEmpty()
+                }
+                .onFailure { e ->
+                    binding.tvStatus.text = "Error: ${e.message}"
+                }
+            binding.progress.visibility = View.GONE
+        }
+    }
+
+    private fun downloadAll() {
+        val treeUri = savedTreeUri()
+        if (treeUri == null) folderPicker.launch(null) else startDownload(treeUri)
+    }
+
+    private fun startDownload(treeUri: Uri) {
+        binding.btnDownloadAll.isEnabled = false
+        val safe = cardTitle.replace(Regex("[^A-Za-z0-9 _-]"), "").trim()
+        val rootDir = DocumentFile.fromTreeUri(this, treeUri) ?: run {
+            binding.tvStatus.text = "Error: cannot access selected folder"
+            binding.btnDownloadAll.isEnabled = true
+            return
+        }
+        val yotoDir = rootDir.findFile("Yoto GoGo") ?: rootDir.createDirectory("Yoto GoGo")
+        val destDir = yotoDir?.findFile(safe) ?: yotoDir?.createDirectory(safe)
+        if (destDir == null) {
+            binding.tvStatus.text = "Error: could not create destination folder"
+            binding.btnDownloadAll.isEnabled = true
+            return
+        }
+        binding.tvStatus.text = "Saving…"
+
+        lifecycleScope.launch {
+            val httpClient = OkHttpClient()
+            currentTracks.forEachIndexed { i, track ->
+                trackAdapter?.updateStatus(i, DownloadStatus.DOWNLOADING)
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val req = Request.Builder().url(track.url).build()
+                        httpClient.newCall(req).execute().use { resp ->
+                            if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
+                            val existing = destDir.findFile(track.filename)
+                            val file = existing ?: destDir.createFile(track.mimeType, track.filename)
+                                ?: throw Exception("Could not create file")
+                            contentResolver.openOutputStream(file.uri)?.use { out ->
+                                resp.body?.byteStream()?.use { it.copyTo(out) }
+                                    ?: throw Exception("Empty body")
+                            } ?: throw Exception("Could not open output stream")
+                        }
+                    }
+                }.onSuccess {
+                    trackAdapter?.updateStatus(i, DownloadStatus.DONE)
+                }.onFailure {
+                    trackAdapter?.updateStatus(i, DownloadStatus.ERROR)
+                }
+            }
+            val done = currentTracks.count { it.status == DownloadStatus.DONE }
+            binding.tvStatus.text = "$done/${currentTracks.size} tracks saved"
+            binding.btnDownloadAll.isEnabled = true
+        }
+    }
+
+    private fun savedTreeUri(): Uri? =
+        getSharedPreferences("yoto", MODE_PRIVATE).getString("tree_uri", null)?.let { Uri.parse(it) }
+
+    private fun saveTreeUri(uri: Uri) {
+        getSharedPreferences("yoto", MODE_PRIVATE).edit()
+            .putString("tree_uri", uri.toString()).apply()
+    }
+
+    private fun updateFolderLabel(uri: Uri) {
+        val doc = DocumentFile.fromTreeUri(this, uri)
+        binding.tvFolderPath.text = doc?.uri?.lastPathSegment ?: uri.toString()
+    }
+
+    private fun authToken() =
+        getSharedPreferences("yoto", MODE_PRIVATE).getString("auth_token", null)
+
+    companion object {
+        const val EXTRA_SLUG = "slug"
+        const val EXTRA_DISPLAY_NAME = "display_name"
+    }
+}
