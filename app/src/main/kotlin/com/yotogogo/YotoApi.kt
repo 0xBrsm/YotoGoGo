@@ -112,15 +112,17 @@ class YotoApi {
             val seen = mutableSetOf<String>()
             val all = mutableListOf<YotoCard>()
 
-            fun add(card: YotoCard?) {
-                card ?: return
-                val id = card.cardId ?: return
-                if (seen.add(id)) all.add(card)
+            fun add(entry: LibraryEntry) {
+                val id = entry.cardId ?: entry.card?.cardId ?: return
+                val card = entry.card ?: return
+                if (seen.add(id)) {
+                    all.add(if (card.cardId == null) card.copy(cardId = id) else card)
+                }
             }
 
-            response.cards?.forEach { add(it.card) }
+            response.cards?.forEach { add(it) }
             response.playlists?.forEach { playlist ->
-                playlist.cards?.forEach { add(it.card) }
+                playlist.cards?.forEach { add(it) }
             }
 
             all.sortedBy { it.title?.lowercase() ?: "" }
