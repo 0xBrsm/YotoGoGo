@@ -108,8 +108,22 @@ class YotoApi {
                 text
             } ?: throw Exception("Empty library response")
 
-            gson.fromJson(body, LibraryResponse::class.java)
-                .cards?.mapNotNull { it.card } ?: emptyList()
+            val response = gson.fromJson(body, LibraryResponse::class.java)
+            val seen = mutableSetOf<String>()
+            val all = mutableListOf<YotoCard>()
+
+            fun add(card: YotoCard?) {
+                card ?: return
+                val id = card.cardId ?: return
+                if (seen.add(id)) all.add(card)
+            }
+
+            response.cards?.forEach { add(it.card) }
+            response.playlists?.forEach { playlist ->
+                playlist.cards?.forEach { add(it.card) }
+            }
+
+            all.sortedBy { it.title?.lowercase() ?: "" }
         }
 
     fun buildTrackList(card: YotoCard): List<TrackItem> {

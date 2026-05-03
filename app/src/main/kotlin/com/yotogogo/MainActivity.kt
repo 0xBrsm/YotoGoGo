@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.yotogogo.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
@@ -32,7 +33,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        binding.rvLibrary.layoutManager = LinearLayoutManager(this)
+        binding.rvLibrary.layoutManager = GridLayoutManager(this, LibraryAdapter.COLUMNS)
         binding.btnLogout.setOnClickListener { logout() }
 
         loadLibrary()

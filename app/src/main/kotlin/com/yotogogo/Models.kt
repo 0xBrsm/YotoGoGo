@@ -9,34 +9,39 @@ data class TokenResponse(
     @SerializedName("error") val error: String?
 )
 
-// __NEXT_DATA__ page embed — used by card page fetch approach
-data class NextData(
-    @SerializedName("props") val props: NextProps?
-)
-data class NextProps(
-    @SerializedName("pageProps") val pageProps: NextPageProps?
-)
-data class NextPageProps(
-    @SerializedName("card") val card: YotoCard?
-)
-
 data class CardResponse(
     @SerializedName("card") val card: YotoCard?
 )
 
 data class LibraryResponse(
-    @SerializedName("cards") val cards: List<LibraryEntry>?
+    @SerializedName("cards") val cards: List<LibraryEntry>?,
+    @SerializedName("playlists") val playlists: List<PlaylistEntry>?
 )
 
 data class LibraryEntry(
     @SerializedName("card") val card: YotoCard?
 )
 
+data class PlaylistEntry(
+    @SerializedName("cards") val cards: List<LibraryEntry>?
+)
+
 data class YotoCard(
     @SerializedName("cardId") val cardId: String?,
     @SerializedName("slug") val slug: String?,
     @SerializedName("title") val title: String?,
+    @SerializedName("metadata") val metadata: CardMetadata?,
     @SerializedName("content") val content: CardContent?
+)
+
+data class CardMetadata(
+    @SerializedName("cover") val cover: CardCover?
+)
+
+data class CardCover(
+    @SerializedName("imageL") val imageL: String?,
+    @SerializedName("imageM") val imageM: String?,
+    @SerializedName("imageS") val imageS: String?
 )
 
 data class CardContent(
