@@ -2,22 +2,21 @@
 """
 Yoto API test script — run from Termux to iterate on API calls without rebuilding the app.
 
-Token is read automatically from the app's SharedPreferences (requires the debug APK
-to be installed). Just log in via the app once, then run this script.
+Token is written to ~/storage/downloads/.yoto_token by the app on login.
+Run the app once, log in, then use this script freely.
 
 Usage:
-  python yoto_api_test.py                        # auto-load token, interactive prompt
-  python yoto_api_test.py --token TOKEN SLUG      # use explicit token, test card directly
+  python yoto_api_test.py                   # auto-load token, interactive prompt
+  python yoto_api_test.py --token TOKEN     # use explicit token
 """
 
 import argparse
 import json
 import os
-import subprocess
 import requests
 
-API_BASE = "https://api.yotoplay.com"
-APP_ID   = "com.yotogogo"
+API_BASE   = "https://api.yotoplay.com"
+TOKEN_FILE = os.path.expanduser("~/storage/downloads/.yoto_token")
 
 HEADERS = {
     "User-Agent": "Yoto/2.73 (com.yotoplay.Yoto; build:10405; iOS 17.4.0) Alamofire/5.6.4",
@@ -25,24 +24,13 @@ HEADERS = {
 
 # ── Token ────────────────────────────────────────────────────────────────────
 
-def load_token_from_app():
-    """Read auth_token from the app's SharedPreferences via run-as (debug APK only)."""
-    prefs_path = f"/data/data/{APP_ID}/shared_prefs/yoto.xml"
-    try:
-        result = subprocess.run(
-            ["/system/bin/run-as", APP_ID, "cat", prefs_path],
-            capture_output=True, text=True, check=True
-        )
-        xml = result.stdout
-        # <string name="auth_token">TOKEN</string>
-        import re
-        match = re.search(r'<string name="auth_token">([^<]+)</string>', xml)
-        if match:
-            return match.group(1)
-        print("auth_token not found in SharedPreferences — log in via the app first.")
-    except subprocess.CalledProcessError as e:
-        print(f"run-as failed: {e.stderr.strip()}")
-        print("Make sure the debug APK is installed and you've logged in via the app.")
+def load_token():
+    if os.path.exists(TOKEN_FILE):
+        token = open(TOKEN_FILE).read().strip()
+        print(f"Loaded token from {TOKEN_FILE}")
+        return token
+    print(f"No token found at {TOKEN_FILE}")
+    print("Log in via the Yoto GoGo app first, then re-run this script.")
     return None
 
 # ── API helpers ──────────────────────────────────────────────────────────────
@@ -106,12 +94,12 @@ def probe_card(token, slug, query=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--token", help="Use this token instead of reading from app")
+    parser.add_argument("--token", help="Use this token instead of reading from Downloads")
     parser.add_argument("slug", nargs="?", help="Card slug to fetch")
     parser.add_argument("query", nargs="?", help="NFC query string (e.g. key=abc123)")
     args = parser.parse_args()
 
-    token = args.token or load_token_from_app()
+    token = args.token or load_token()
     if not token:
         return
 
