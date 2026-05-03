@@ -15,7 +15,6 @@
         android:layout_marginBottom="8dp" />
 
     <TextView
-        android:id="@+id/tvInstructions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Connect your Yoto account to download cards."
@@ -35,65 +34,6 @@
         android:layout_gravity="center_horizontal"
         android:layout_marginTop="24dp"
         android:visibility="gone" />
-
-    <LinearLayout
-        android:id="@+id/layoutCode"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="24dp"
-        android:background="#F0F0F0"
-        android:padding="16dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="1. Open this URL in your browser:"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvUrl"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textColor="#0066CC"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="8dp"
-            android:autoLink="web"
-            android:linksClickable="true" />
-
-        <Button
-            android:id="@+id/btnOpenBrowser"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Open in Browser"
-            android:layout_marginBottom="16dp"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="2. Enter this code (tap to copy):"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvCode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.15"
-            android:layout_marginTop="4dp"
-            android:textIsSelectable="true" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Waiting for authorization…"
-            android:layout_marginTop="12dp"
-            android:textColor="#666666" />
-    </LinearLayout>
 
     <TextView
         android:id="@+id/tvError"

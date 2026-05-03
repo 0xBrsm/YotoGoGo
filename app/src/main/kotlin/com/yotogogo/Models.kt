@@ -2,15 +2,6 @@ package com.yotogogo
 
 import com.google.gson.annotations.SerializedName
 
-data class DeviceCodeResponse(
-    @SerializedName("device_code") val deviceCode: String,
-    @SerializedName("user_code") val userCode: String,
-    @SerializedName("verification_uri") val verificationUri: String,
-    @SerializedName("verification_uri_complete") val verificationUriComplete: String?,
-    @SerializedName("expires_in") val expiresIn: Int,
-    @SerializedName("interval") val interval: Int
-)
-
 data class TokenResponse(
     @SerializedName("access_token") val accessToken: String?,
     @SerializedName("refresh_token") val refreshToken: String?,

@@ -1,14 +1,11 @@
 package com.yotogogo
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.lifecycleScope
 import com.yotogogo.databinding.ActivityLoginBinding
 import kotlinx.coroutines.launch
@@ -25,54 +22,82 @@ class LoginActivity : AppCompatActivity() {
 
         if (savedToken() != null) { startMain(); return }
 
-        binding.btnConnect.setOnClickListener { startDeviceFlow() }
+        // Returning from browser redirect
+        handleCallbackIntent(intent)
+
+        binding.btnConnect.setOnClickListener { startPkceFlow() }
     }
 
-    private fun startDeviceFlow() {
-        binding.btnConnect.isEnabled = false
-        binding.progress.visibility = View.VISIBLE
-        binding.tvInstructions.visibility = View.GONE
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleCallbackIntent(intent)
+    }
+
+    private fun handleCallbackIntent(intent: Intent) {
+        val uri = intent.data ?: return
+        if (uri.scheme != "com.yotogogo" || uri.host != "callback") return
+
+        val error = uri.getQueryParameter("error")
+        if (error != null) {
+            showError("Login denied: $error")
+            return
+        }
+
+        val code = uri.getQueryParameter("code") ?: run {
+            showError("No code in callback")
+            return
+        }
+
+        exchangeCode(code)
+    }
+
+    private fun startPkceFlow() {
+        val verifier  = YotoApi.generateCodeVerifier()
+        val challenge = YotoApi.generateCodeChallenge(verifier)
+
+        prefs().edit().putString("pkce_verifier", verifier).apply()
+
+        CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+            .launchUrl(this, Uri.parse(YotoApi.buildAuthUrl(challenge)))
+    }
+
+    private fun exchangeCode(code: String) {
+        val verifier = prefs().getString("pkce_verifier", null) ?: run {
+            showError("Session expired — please try again")
+            return
+        }
+
+        setLoading(true)
 
         lifecycleScope.launch {
-            runCatching { api.requestDeviceCode() }
-                .onSuccess { codes ->
-                    binding.tvCode.text = codes.userCode
-                    binding.tvUrl.text = codes.verificationUri
-                    binding.layoutCode.visibility = View.VISIBLE
-
-                    binding.btnOpenBrowser.setOnClickListener {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(codes.verificationUri)))
-                    }
-                    binding.tvCode.setOnClickListener {
-                        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("Yoto code", codes.userCode))
-                        Toast.makeText(this@LoginActivity, "Code copied", Toast.LENGTH_SHORT).show()
-                    }
-
-                    // Poll in the background until authorized
-                    runCatching { api.pollForToken(codes) }
-                        .onSuccess { token ->
-                            getSharedPreferences("yoto", MODE_PRIVATE)
-                                .edit().putString("auth_token", token).apply()
-                            startMain()
-                        }
-                        .onFailure { e -> showError(e.message ?: "Authorization failed") }
+            runCatching { api.exchangeCodeForToken(code, verifier) }
+                .onSuccess { token ->
+                    prefs().edit()
+                        .putString("auth_token", token)
+                        .remove("pkce_verifier")
+                        .apply()
+                    startMain()
                 }
-                .onFailure { e -> showError(e.message ?: "Could not start login") }
+                .onFailure { e -> showError(e.message ?: "Authentication failed") }
         }
     }
 
     private fun showError(msg: String) {
         binding.tvError.text = msg
         binding.tvError.visibility = View.VISIBLE
-        binding.progress.visibility = View.GONE
-        binding.layoutCode.visibility = View.GONE
+        setLoading(false)
         binding.btnConnect.isEnabled = true
-        binding.tvInstructions.visibility = View.VISIBLE
     }
 
-    private fun savedToken() =
-        getSharedPreferences("yoto", MODE_PRIVATE).getString("auth_token", null)
+    private fun setLoading(loading: Boolean) {
+        binding.progress.visibility = if (loading) View.VISIBLE else View.GONE
+        binding.btnConnect.isEnabled = !loading
+    }
+
+    private fun prefs() = getSharedPreferences("yoto", MODE_PRIVATE)
+    private fun savedToken() = prefs().getString("auth_token", null)
 
     private fun startMain() {
         startActivity(Intent(this, MainActivity::class.java))
