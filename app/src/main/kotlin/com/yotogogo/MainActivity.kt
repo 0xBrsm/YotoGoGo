@@ -112,13 +112,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extractSlug(uri: String): String? {
-        if (uri.startsWith("https://yoto.io/") || uri.startsWith("https://yotoplay.com/")) {
-            return uri.substringAfterLast('/').takeIf { it.isNotBlank() }
-        }
-        Regex("^yoto://[^/]+/(.+)$").find(uri)?.let {
-            return it.groupValues[1].trimEnd('/')
-        }
-        return uri.trimEnd('/').substringAfterLast('/').takeIf { it.isNotBlank() }
+        // Use Uri parser so query strings are never included in the slug
+        val parsed = android.net.Uri.parse(uri)
+        return parsed.lastPathSegment?.takeIf { it.isNotBlank() }
     }
 
     private fun uriPrefixFor(code: Byte): String = when (code.toInt()) {
