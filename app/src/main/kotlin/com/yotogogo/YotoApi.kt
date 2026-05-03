@@ -48,6 +48,7 @@ class YotoApi {
                 .appendQueryParameter("response_type", "code")
                 .appendQueryParameter("client_id", CLIENT_ID)
                 .appendQueryParameter("redirect_uri", REDIRECT_URI)
+                .appendQueryParameter("audience", API_BASE)
                 .appendQueryParameter("code_challenge", codeChallenge)
                 .appendQueryParameter("code_challenge_method", "S256")
                 .appendQueryParameter("scope", SCOPES)

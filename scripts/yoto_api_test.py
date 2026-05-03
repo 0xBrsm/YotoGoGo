@@ -46,6 +46,7 @@ def authenticate():
         "response_type":         "code",
         "client_id":             CLIENT_ID,
         "redirect_uri":          REDIRECT_URI,
+        "audience":              API_BASE,
         "code_challenge":        challenge,
         "code_challenge_method": "S256",
         "scope":                 SCOPES,
@@ -116,6 +117,9 @@ def list_library(token):
     print(f"GET {url}")
     r = requests.get(url, headers={**HEADERS, "Authorization": f"Bearer {token}"})
     print(f"Status: {r.status_code}")
+    if not r.ok:
+        print(r.text[:500])
+        return r
     try:
         data = r.json()
         cards = data.get("cards", [])
