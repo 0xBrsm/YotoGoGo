@@ -3,6 +3,7 @@ package com.yotogogo
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.yotogogo.databinding.ItemTrackBinding
 
 class TrackAdapter(private val items: List<TrackItem>) :
@@ -18,11 +19,19 @@ class TrackAdapter(private val items: List<TrackItem>) :
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
         holder.binding.tvTrackName.text = item.displayTitle
+        if (item.iconUrl != null) {
+            holder.binding.imgTrackIcon.load(item.iconUrl) {
+                crossfade(true)
+                placeholder(R.drawable.ic_music_note)
+            }
+        } else {
+            holder.binding.imgTrackIcon.setImageResource(R.drawable.ic_music_note)
+        }
         holder.binding.tvStatus.text = when (item.status) {
             DownloadStatus.PENDING     -> ""
-            DownloadStatus.DOWNLOADING -> "⬇ downloading…"
-            DownloadStatus.DONE        -> "✓ saved"
-            DownloadStatus.ERROR       -> "✗ error"
+            DownloadStatus.DOWNLOADING -> "⬇"
+            DownloadStatus.DONE        -> "✓"
+            DownloadStatus.ERROR       -> "✗"
         }
     }
 

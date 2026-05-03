@@ -60,13 +60,20 @@ data class Track(
     @SerializedName("title") val title: String?,
     @SerializedName("format") val format: String?,
     @SerializedName("duration") val duration: Double?,
-    @SerializedName("fileSize") val fileSize: Long?
+    @SerializedName("fileSize") val fileSize: Long?,
+    @SerializedName("display") val display: TrackDisplay?
+)
+
+data class TrackDisplay(
+    @SerializedName("icon16x16") val icon16x16: String?,
+    @SerializedName("icon400x400") val icon400x400: String?
 )
 
 data class TrackItem(
     val chapterTitle: String,
     val trackIndex: Int,
     val displayTitle: String,
+    val iconUrl: String?,
     val url: String,
     val filename: String,
     val mimeType: String = "audio/mpeg",
