@@ -2,105 +2,50 @@
 """
 Yoto API test script — run from Termux to iterate on API calls without rebuilding the app.
 
-One-time setup: add http://localhost:8765/callback to Allowed Callback URLs
-in your Yoto developer portal app settings.
+Token is read automatically from the app's SharedPreferences (requires the debug APK
+to be installed). Just log in via the app once, then run this script.
 
 Usage:
-  python yoto_api_test.py                        # auth + interactive prompt
-  python yoto_api_test.py --token TOKEN SLUG      # skip auth, test card directly
-  python yoto_api_test.py --token TOKEN SLUG QUERY # include NFC query string
+  python yoto_api_test.py                        # auto-load token, interactive prompt
+  python yoto_api_test.py --token TOKEN SLUG      # use explicit token, test card directly
 """
 
 import argparse
-import base64
-import hashlib
-import http.server
 import json
 import os
-import secrets
-import threading
-import urllib.parse
-import webbrowser
+import subprocess
 import requests
 
-TOKEN_FILE = os.path.expanduser("~/.yoto_token")
-
-CLIENT_ID    = "Ui8g0T3UR0CIsZJMhHpzouU8dfAm4ZEK"
-REDIRECT_URI = "http://localhost:8765/callback"
-AUTHORIZE    = "https://login.yotoplay.com/authorize"
-TOKEN_URL    = "https://login.yotoplay.com/oauth/token"
-API_BASE     = "https://api.yotoplay.com"
-SCOPES       = "family:library:view user:content:view offline_access"
-
-# ── PKCE helpers ────────────────────────────────────────────────────────────
-
-def pkce_pair():
-    verifier  = base64.urlsafe_b64encode(secrets.token_bytes(64)).rstrip(b"=").decode()
-    challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(verifier.encode()).digest()
-    ).rstrip(b"=").decode()
-    return verifier, challenge
-
-# ── Auth flow ────────────────────────────────────────────────────────────────
-
-def authenticate():
-    verifier, challenge = pkce_pair()
-    auth_url = AUTHORIZE + "?" + urllib.parse.urlencode({
-        "response_type":         "code",
-        "client_id":             CLIENT_ID,
-        "redirect_uri":          REDIRECT_URI,
-        "audience":              API_BASE,
-        "code_challenge":        challenge,
-        "code_challenge_method": "S256",
-        "scope":                 SCOPES,
-    })
-
-    code_holder = {}
-
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            if "code" in params:
-                code_holder["code"] = params["code"][0]
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"<h2>Authorized! You can close this tab.</h2>")
-
-        def log_message(self, *args):
-            pass  # suppress server noise
-
-    server = http.server.HTTPServer(("localhost", 8765), Handler)
-    thread = threading.Thread(target=server.handle_request)
-    thread.start()
-
-    print(f"\nOpening browser for Yoto login…\n{auth_url}\n")
-    webbrowser.open(auth_url)
-    thread.join(timeout=120)
-
-    code = code_holder.get("code")
-    if not code:
-        raise RuntimeError("No code received — did the browser redirect back?")
-
-    resp = requests.post(TOKEN_URL, data={
-        "grant_type":    "authorization_code",
-        "client_id":     CLIENT_ID,
-        "code":          code,
-        "redirect_uri":  REDIRECT_URI,
-        "code_verifier": verifier,
-    })
-    resp.raise_for_status()
-    token = resp.json().get("access_token")
-    if not token:
-        raise RuntimeError(f"No access_token in response: {resp.text}")
-    print(f"Token: {token[:20]}…\n")
-    return token
-
-# ── API helpers ──────────────────────────────────────────────────────────────
+API_BASE = "https://api.yotoplay.com"
+APP_ID   = "com.yotogogo"
 
 HEADERS = {
     "User-Agent": "Yoto/2.73 (com.yotoplay.Yoto; build:10405; iOS 17.4.0) Alamofire/5.6.4",
 }
+
+# ── Token ────────────────────────────────────────────────────────────────────
+
+def load_token_from_app():
+    """Read auth_token from the app's SharedPreferences via run-as (debug APK only)."""
+    prefs_path = f"/data/data/{APP_ID}/shared_prefs/yoto.xml"
+    try:
+        result = subprocess.run(
+            ["run-as", APP_ID, "cat", prefs_path],
+            capture_output=True, text=True, check=True
+        )
+        xml = result.stdout
+        # <string name="auth_token">TOKEN</string>
+        import re
+        match = re.search(r'<string name="auth_token">([^<]+)</string>', xml)
+        if match:
+            return match.group(1)
+        print("auth_token not found in SharedPreferences — log in via the app first.")
+    except subprocess.CalledProcessError as e:
+        print(f"run-as failed: {e.stderr.strip()}")
+        print("Make sure the debug APK is installed and you've logged in via the app.")
+    return None
+
+# ── API helpers ──────────────────────────────────────────────────────────────
 
 def get_card(token, slug, query=None):
     url = f"{API_BASE}/card/{slug}"
@@ -125,19 +70,12 @@ def list_library(token):
         return r
     try:
         data = r.json()
-        cards = data.get("cards", [])
-        print(f"{len(cards)} card(s) in library:")
-        for c in cards[:10]:
-            card = c.get("card", {})
-            print(f"  {card.get('cardId')} — {card.get('title')}")
-        if len(cards) > 10:
-            print(f"  … and {len(cards) - 10} more")
+        print(json.dumps(data, indent=2)[:6000])
     except Exception:
         print(r.text[:1000])
     return r
 
 def probe_card(token, slug, query=None):
-    """Try all plausible endpoint shapes and report which ones work."""
     qs = f"?{query}" if query else ""
     candidates = [
         f"{API_BASE}/card/{slug}{qs}",
@@ -168,22 +106,14 @@ def probe_card(token, slug, query=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--token", help="Skip auth and use this token")
-    parser.add_argument("--reauth", action="store_true", help="Force fresh login")
+    parser.add_argument("--token", help="Use this token instead of reading from app")
     parser.add_argument("slug", nargs="?", help="Card slug to fetch")
     parser.add_argument("query", nargs="?", help="NFC query string (e.g. key=abc123)")
     args = parser.parse_args()
 
-    if args.token:
-        token = args.token
-    elif not args.reauth and os.path.exists(TOKEN_FILE):
-        token = open(TOKEN_FILE).read().strip()
-        print(f"Loaded token from {TOKEN_FILE}")
-    else:
-        token = authenticate()
-        open(TOKEN_FILE, "w").write(token)
-        os.chmod(TOKEN_FILE, 0o600)
-        print(f"Token saved to {TOKEN_FILE}")
+    token = args.token or load_token_from_app()
+    if not token:
+        return
 
     if args.slug:
         probe_card(token, args.slug, args.query)
