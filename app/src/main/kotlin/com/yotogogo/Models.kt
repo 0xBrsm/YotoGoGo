@@ -9,6 +9,17 @@ data class TokenResponse(
     @SerializedName("error") val error: String?
 )
 
+// __NEXT_DATA__ page embed — used by card page fetch approach
+data class NextData(
+    @SerializedName("props") val props: NextProps?
+)
+data class NextProps(
+    @SerializedName("pageProps") val pageProps: NextPageProps?
+)
+data class NextPageProps(
+    @SerializedName("card") val card: YotoCard?
+)
+
 data class CardResponse(
     @SerializedName("card") val card: YotoCard?
 )

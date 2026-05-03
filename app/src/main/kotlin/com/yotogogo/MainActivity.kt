@@ -78,17 +78,17 @@ class MainActivity : AppCompatActivity() {
         ) return
 
         val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG) ?: return
-        val slug = readSlugFromTag(tag)
+        val nfcUrl = readUrlFromTag(tag)
 
-        if (slug == null) {
+        if (nfcUrl == null) {
             binding.tvStatus.text = "Could not read card. Raw tag ID: ${tag.id.toHex()}"
             return
         }
 
-        fetchCard(slug)
+        fetchCard(nfcUrl)
     }
 
-    private fun readSlugFromTag(tag: Tag): String? {
+    private fun readUrlFromTag(tag: Tag): String? {
         val ndef = Ndef.get(tag) ?: return null
         return try {
             ndef.connect()
@@ -102,19 +102,13 @@ class MainActivity : AppCompatActivity() {
                     val payload = record.payload
                     val uri = uriPrefixFor(payload[0]) + String(payload.drop(1).toByteArray())
                     binding.tvStatus.text = "Read: $uri"
-                    extractSlug(uri)
+                    uri.takeIf { it.isNotBlank() }
                 } else null
             }
         } catch (e: Exception) {
             binding.tvStatus.text = "NFC read error: ${e.message}"
             null
         }
-    }
-
-    private fun extractSlug(uri: String): String? {
-        // Use Uri parser so query strings are never included in the slug
-        val parsed = android.net.Uri.parse(uri)
-        return parsed.lastPathSegment?.takeIf { it.isNotBlank() }
     }
 
     private fun uriPrefixFor(code: Byte): String = when (code.toInt()) {
@@ -125,15 +119,15 @@ class MainActivity : AppCompatActivity() {
         else -> ""
     }
 
-    private fun fetchCard(slug: String) {
-        val token = authToken() ?: run { logout(); return }
+    private fun fetchCard(nfcUrl: String) {
+        val slug = android.net.Uri.parse(nfcUrl).lastPathSegment ?: nfcUrl
 
         setLoading(true)
         binding.tvStatus.text = "Fetching: $slug…"
         binding.btnDownloadAll.visibility = View.GONE
 
         lifecycleScope.launch {
-            runCatching { api.getCard(token, slug) }
+            runCatching { api.fetchCardFromPage(nfcUrl) }
                 .onSuccess { card ->
                     cardTitle = card.title ?: slug
                     binding.tvCardTitle.text = cardTitle
@@ -144,7 +138,7 @@ class MainActivity : AppCompatActivity() {
                     binding.btnDownloadAll.visibility =
                         if (currentTracks.isNotEmpty()) View.VISIBLE else View.GONE
                 }
-                .onFailure { e -> binding.tvStatus.text = "Error fetching \"$slug\":\n${e.message}" }
+                .onFailure { e -> binding.tvStatus.text = "Error: ${e.message}" }
             setLoading(false)
         }
     }

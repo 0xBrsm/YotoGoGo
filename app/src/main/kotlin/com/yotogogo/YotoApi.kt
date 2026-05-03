@@ -75,23 +75,28 @@ class YotoApi {
                 ?: throw Exception("No access token in response: $json")
         }
 
-    suspend fun getCard(accessToken: String, cardSlug: String): YotoCard =
-        withContext(Dispatchers.IO) {
-            val req = Request.Builder()
-                .url("$API_BASE/card/$cardSlug")
-                .header("Authorization", "Bearer $accessToken")
-                .header("User-Agent", USER_AGENT)
-                .get().build()
-
-            val body = client.newCall(req).execute().use { resp ->
+    // Fetch the full Yoto card page URL (preserving query string from NFC tag)
+    // and extract card data from the embedded __NEXT_DATA__ JSON.
+    // No auth required — the query string in the NFC URL is the ownership proof.
+    suspend fun fetchCardFromPage(nfcUrl: String): YotoCard = withContext(Dispatchers.IO) {
+        val html = client.newCall(Request.Builder().url(nfcUrl).get().build())
+            .execute().use { resp ->
                 val text = resp.body?.string()
-                if (!resp.isSuccessful) throw Exception("Card fetch error ${resp.code}: $text")
+                if (!resp.isSuccessful) throw Exception("Page fetch error ${resp.code}: $text")
                 text
-            } ?: throw Exception("Empty card response")
+            } ?: throw Exception("Empty page response")
 
-            gson.fromJson(body, CardResponse::class.java).card
-                ?: throw Exception("No card in response")
-        }
+        val marker = """<script id="__NEXT_DATA__" type="application/json">"""
+        val start  = html.indexOf(marker)
+        if (start == -1) throw Exception("__NEXT_DATA__ not found in page")
+        val jsonStart = start + marker.length
+        val jsonEnd   = html.indexOf("</script>", jsonStart)
+        val json      = html.substring(jsonStart, jsonEnd)
+
+        gson.fromJson(json, NextData::class.java)
+            ?.props?.pageProps?.card
+            ?: throw Exception("No card in page data")
+    }
 
     fun buildTrackList(card: YotoCard): List<TrackItem> {
         val items = mutableListOf<TrackItem>()
