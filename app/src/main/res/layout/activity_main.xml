@@ -33,7 +33,8 @@
         android:layout_height="wrap_content"
         android:text="Tap a Yoto card to begin"
         android:textSize="16sp"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="8dp"
+        android:textIsSelectable="true" />
 
     <ProgressBar
         android:id="@+id/progress"

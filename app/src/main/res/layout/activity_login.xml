@@ -41,6 +41,7 @@
         android:layout_height="wrap_content"
         android:textColor="#CC0000"
         android:layout_marginTop="16dp"
+        android:textIsSelectable="true"
         android:visibility="gone" />
 
 </LinearLayout>
