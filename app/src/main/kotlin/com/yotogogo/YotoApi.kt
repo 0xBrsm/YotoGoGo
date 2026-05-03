@@ -143,7 +143,7 @@ class YotoApi {
                 val safe = chTitle.replace(Regex("[^A-Za-z0-9 ]"), "").trim().replace(' ', '_')
                 val displayTitle = track.title?.takeIf { it.isNotBlank() }
                     ?: if (chapter.tracks.size > 1) "$chTitle (${ti + 1})" else chTitle
-                val iconUrl = track.display?.icon400x400 ?: track.display?.icon16x16
+                val iconUrl = chapter.display?.icon400x400 ?: chapter.display?.icon16x16
                 items.add(TrackItem(chTitle, ti + 1, displayTitle, iconUrl, url, "%02d_%02d_%s.%s".format(ci + 1, ti + 1, safe, ext), mime))
             }
         }

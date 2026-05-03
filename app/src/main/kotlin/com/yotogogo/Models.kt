@@ -52,7 +52,13 @@ data class CardContent(
 data class Chapter(
     @SerializedName("key") val key: String?,
     @SerializedName("title") val title: String?,
-    @SerializedName("tracks") val tracks: List<Track>?
+    @SerializedName("tracks") val tracks: List<Track>?,
+    @SerializedName("display") val display: ChapterDisplay?
+)
+
+data class ChapterDisplay(
+    @SerializedName("icon16x16") val icon16x16: String?,
+    @SerializedName("icon400x400") val icon400x400: String?
 )
 
 data class Track(
@@ -60,13 +66,7 @@ data class Track(
     @SerializedName("title") val title: String?,
     @SerializedName("format") val format: String?,
     @SerializedName("duration") val duration: Double?,
-    @SerializedName("fileSize") val fileSize: Long?,
-    @SerializedName("display") val display: TrackDisplay?
-)
-
-data class TrackDisplay(
-    @SerializedName("icon16x16") val icon16x16: String?,
-    @SerializedName("icon400x400") val icon400x400: String?
+    @SerializedName("fileSize") val fileSize: Long?
 )
 
 data class TrackItem(
