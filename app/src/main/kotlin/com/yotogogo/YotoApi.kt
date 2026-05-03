@@ -141,7 +141,9 @@ class YotoApi {
                     else -> "mp3" to "audio/mpeg"
                 }
                 val safe = chTitle.replace(Regex("[^A-Za-z0-9 ]"), "").trim().replace(' ', '_')
-                items.add(TrackItem(chTitle, ti + 1, url, "%02d_%02d_%s.%s".format(ci + 1, ti + 1, safe, ext), mime))
+                val displayTitle = track.title?.takeIf { it.isNotBlank() }
+                    ?: if (chapter.tracks.size > 1) "$chTitle (${ti + 1})" else chTitle
+                items.add(TrackItem(chTitle, ti + 1, displayTitle, url, "%02d_%02d_%s.%s".format(ci + 1, ti + 1, safe, ext), mime))
             }
         }
         return items

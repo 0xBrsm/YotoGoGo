@@ -66,6 +66,7 @@ data class Track(
 data class TrackItem(
     val chapterTitle: String,
     val trackIndex: Int,
+    val displayTitle: String,
     val url: String,
     val filename: String,
     val mimeType: String = "audio/mpeg",

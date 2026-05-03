@@ -17,7 +17,7 @@ class TrackAdapter(private val items: List<TrackItem>) :
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        holder.binding.tvTrackName.text = item.filename
+        holder.binding.tvTrackName.text = item.displayTitle
         holder.binding.tvStatus.text = when (item.status) {
             DownloadStatus.PENDING     -> ""
             DownloadStatus.DOWNLOADING -> "⬇ downloading…"
