@@ -30,30 +30,35 @@
             android:maxLines="2" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tvStatus"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="14sp"
-        android:layout_marginBottom="4dp"
-        android:textIsSelectable="true" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp">
 
-    <ProgressBar
-        android:id="@+id/progress"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        android:layout_marginBottom="4dp" />
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="14sp"
+            android:textIsSelectable="true" />
 
-    <CheckBox
-        android:id="@+id/cbSelectAll"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Select all"
-        android:checked="true"
-        android:visibility="gone"
-        android:layoutDirection="rtl"
-        android:layout_marginBottom="2dp" />
+        <ProgressBar
+            android:id="@+id/progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <CheckBox
+            android:id="@+id/cbSelectAll"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:visibility="gone" />
+
+    </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvTracks"
