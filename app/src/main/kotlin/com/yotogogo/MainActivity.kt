@@ -120,14 +120,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun fetchCard(nfcUrl: String) {
-        val slug = android.net.Uri.parse(nfcUrl).lastPathSegment ?: nfcUrl
+        val slug  = android.net.Uri.parse(nfcUrl).lastPathSegment ?: nfcUrl
+        val token = authToken() ?: run { logout(); return }
 
         setLoading(true)
         binding.tvStatus.text = "Fetching: $slug…"
         binding.btnDownloadAll.visibility = View.GONE
 
         lifecycleScope.launch {
-            runCatching { api.fetchCardFromPage(nfcUrl) }
+            runCatching { api.getCard(token, slug) }
                 .onSuccess { card ->
                     cardTitle = card.title ?: slug
                     binding.tvCardTitle.text = cardTitle
