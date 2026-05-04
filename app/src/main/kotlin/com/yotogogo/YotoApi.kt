@@ -135,6 +135,7 @@ class YotoApi {
                     track.format?.contains("mp3")  == true -> "mp3" to "audio/mpeg"
                     track.format?.contains("mpeg") == true -> "mp3" to "audio/mpeg"
                     track.format?.contains("m4a")  == true -> "m4a" to "audio/mp4"
+                    track.format?.contains("aac")  == true -> "aac" to "audio/aac"
                     else -> "mp3" to "audio/mpeg"
                 }
                 val safe = chTitle.replace(Regex("[^A-Za-z0-9 ]"), "").trim().replace(' ', '_')
