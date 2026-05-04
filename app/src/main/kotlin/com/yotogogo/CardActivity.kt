@@ -164,8 +164,9 @@ class CardActivity : AppCompatActivity() {
                     }
                 }.onSuccess {
                     if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.DONE)
-                }.onFailure {
+                }.onFailure { e ->
                     if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.ERROR)
+                    binding.tvStatus.text = "Error: ${e::class.simpleName}: ${e.message}"
                 }
             }
             val done = tracksToDownload.count { it.status == DownloadStatus.DONE }
