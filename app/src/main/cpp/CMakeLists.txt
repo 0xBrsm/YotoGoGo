@@ -9,15 +9,19 @@ FetchContent_Declare(
     GIT_TAG        3.1.1
     GIT_SHALLOW    TRUE
 )
-FetchContent_Populate(shine)
+FetchContent_GetProperties(shine)
+if(NOT shine_POPULATED)
+    FetchContent_Populate(shine)
+endif()
 
 set(SHINE_SRC
     ${shine_SOURCE_DIR}/src/lib/bitstream.c
     ${shine_SOURCE_DIR}/src/lib/huffman.c
     ${shine_SOURCE_DIR}/src/lib/l3bitstream.c
-    ${shine_SOURCE_DIR}/src/lib/mdct.c
-    ${shine_SOURCE_DIR}/src/lib/platform.c
-    ${shine_SOURCE_DIR}/src/lib/psycho_acoustics.c
+    ${shine_SOURCE_DIR}/src/lib/l3loop.c
+    ${shine_SOURCE_DIR}/src/lib/l3mdct.c
+    ${shine_SOURCE_DIR}/src/lib/l3subband.c
+    ${shine_SOURCE_DIR}/src/lib/layer3.c
     ${shine_SOURCE_DIR}/src/lib/reservoir.c
     ${shine_SOURCE_DIR}/src/lib/tables.c
 )

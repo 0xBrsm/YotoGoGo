@@ -1,16 +1,15 @@
 #include <jni.h>
 #include <android/log.h>
 #include <cstdlib>
-#include <cstring>
-#include "shine.h"
+#include "layer3.h"
 
 #define TAG "ShineBridge"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 struct ShineWrapper {
-    shine_t  enc;
-    int      channels;
-    int      samplesPerPass;
+    shine_t enc;
+    int     channels;
+    int     samplesPerPass;
 };
 
 extern "C" {
@@ -22,7 +21,7 @@ Java_com_yotogogo_Mp3Encoder_nativeCreate(JNIEnv*, jobject,
     shine_config_t cfg;
     shine_set_config_mpeg_defaults(&cfg.mpeg);
     cfg.wave.samplerate = sampleRate;
-    cfg.wave.channels   = (channels == 1) ? MONO : STEREO;
+    cfg.wave.channels   = (channels == 1) ? PCM_MONO : PCM_STEREO;
     cfg.mpeg.bitr       = bitrate;
     cfg.mpeg.mode       = (channels == 1) ? MONO : JOINT_STEREO;
 
@@ -46,39 +45,11 @@ Java_com_yotogogo_Mp3Encoder_nativeEncode(JNIEnv* env, jobject,
     jsize len = env->GetArrayLength(pcm);
     jshort* src = env->GetShortArrayElements(pcm, nullptr);
 
-    // shine expects non-interleaved: separate left/right arrays of samplesPerPass
-    int spp = w->samplesPerPass;
-    int ch  = w->channels;
-
-    // pcm length must equal spp * ch
-    if (len != spp * ch) {
-        LOGE("nativeEncode: expected %d shorts, got %d", spp * ch, (int)len);
-        env->ReleaseShortArrayElements(pcm, src, JNI_ABORT);
-        return nullptr;
-    }
-
-    // deinterleave into shine's expected buffer layout
-    // shine_encode takes int16_t*[2] (one pointer per channel)
-    int16_t* buf[2];
-    buf[0] = new int16_t[spp];
-    buf[1] = (ch == 2) ? new int16_t[spp] : buf[0];  // mono: both pointers to same buffer
-
-    if (ch == 2) {
-        for (int i = 0; i < spp; i++) {
-            buf[0][i] = src[i * 2];
-            buf[1][i] = src[i * 2 + 1];
-        }
-    } else {
-        memcpy(buf[0], src, spp * sizeof(int16_t));
-    }
+    int outBytes = 0;
+    unsigned char* mp3 = shine_encode_buffer_interleaved(
+        w->enc, reinterpret_cast<int16_t*>(src), &outBytes);
 
     env->ReleaseShortArrayElements(pcm, src, JNI_ABORT);
-
-    int outBytes = 0;
-    unsigned char* mp3 = shine_encode_buffer(w->enc, buf, &outBytes);
-
-    delete[] buf[0];
-    if (ch == 2) delete[] buf[1];
 
     if (!mp3 || outBytes <= 0) return nullptr;
 
