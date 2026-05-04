@@ -17,6 +17,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Install NDK 27
+        run: echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "ndk;27.2.12479018"
+
       # Downloads Gradle 8.7 — no wrapper jar needed
       - uses: gradle/actions/setup-gradle@v4
         with:
