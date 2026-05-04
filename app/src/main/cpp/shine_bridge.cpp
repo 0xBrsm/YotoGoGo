@@ -1,7 +1,9 @@
 #include <jni.h>
 #include <android/log.h>
 #include <cstdlib>
+extern "C" {
 #include "layer3.h"
+}
 
 #define TAG "ShineBridge"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
