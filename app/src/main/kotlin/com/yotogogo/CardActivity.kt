@@ -11,8 +11,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.yotogogo.databinding.ActivityCardBinding
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -128,7 +128,7 @@ class CardActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val httpClient = OkHttpClient()
             val transcodeSemaphore = Semaphore(8)
-            val transcodeJobs = mutableListOf<kotlinx.coroutines.Deferred<Unit>>()
+            val transcodeJobs = mutableListOf<Job>()
             var doneCount = 0
             var errorCount = 0
 
@@ -160,7 +160,7 @@ class CardActivity : AppCompatActivity() {
                 trackAdapter?.updateStatus(globalIndex, if (saveAsMp3) DownloadStatus.TRANSCODING else DownloadStatus.DOWNLOADING)
 
                 // Launch transcode/write in parallel, up to 8 concurrent
-                transcodeJobs += async(Dispatchers.IO) {
+                transcodeJobs += launch(Dispatchers.IO) {
                     transcodeSemaphore.withPermit {
                         runCatching {
                             val (outFilename, outMime) = if (saveAsMp3)
@@ -192,7 +192,7 @@ class CardActivity : AppCompatActivity() {
                 }
             }
 
-            transcodeJobs.awaitAll()
+            transcodeJobs.joinAll()
 
             stopService(Intent(this@CardActivity, DownloadService::class.java))
             binding.tvStatus.text = buildString {
