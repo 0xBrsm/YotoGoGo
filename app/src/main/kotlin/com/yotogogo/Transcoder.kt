@@ -3,15 +3,15 @@ package com.yotogogo
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import java.io.File
+import java.io.BufferedOutputStream
 import java.io.OutputStream
 import java.nio.ByteOrder
 
 object Transcoder {
 
-    fun toMp3(input: File, output: OutputStream, bitrateKbps: Int = 128) {
+    fun toMp3(url: String, output: OutputStream, bitrateKbps: Int = 128) {
         val extractor = MediaExtractor()
-        extractor.setDataSource(input.absolutePath)
+        extractor.setDataSource(url)
 
         var trackIndex = -1
         var format: MediaFormat? = null
@@ -23,17 +23,18 @@ object Transcoder {
                 break
             }
         }
-        requireNotNull(format) { "No audio track found in $input" }
+        requireNotNull(format) { "No audio track found at $url" }
         extractor.selectTrack(trackIndex)
 
-        val mime     = format.getString(MediaFormat.KEY_MIME)!!
+        val mime       = format.getString(MediaFormat.KEY_MIME)!!
         val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-        val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        val channels   = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
 
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
         codec.start()
 
+        val buffered = BufferedOutputStream(output, 65536)
         Mp3Encoder(sampleRate, channels, bitrateKbps).use { encoder ->
             val info = MediaCodec.BufferInfo()
             var eos = false
@@ -59,15 +60,16 @@ object Transcoder {
                         outBuf.limit(info.offset + info.size)
                         val pcmBytes = ByteArray(info.size)
                         outBuf.get(pcmBytes)
-                        encoder.feed(pcmBytes.toShortArray(), output)
+                        encoder.feed(pcmBytes.toShortArray(), buffered)
                     }
                     codec.releaseOutputBuffer(outIdx, false)
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) eos = true
                 }
             }
 
-            encoder.flush(output)
+            encoder.flush(buffered)
         }
+        buffered.flush()
 
         codec.stop()
         codec.release()

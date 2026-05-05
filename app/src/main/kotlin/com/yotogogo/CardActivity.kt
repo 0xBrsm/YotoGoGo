@@ -15,7 +15,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
 
 class CardActivity : AppCompatActivity() {
 
@@ -128,33 +127,23 @@ class CardActivity : AppCompatActivity() {
                 if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.DOWNLOADING)
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        val req = Request.Builder().url(track.url).build()
-                        httpClient.newCall(req).execute().use { resp ->
-                            if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
+                        val (outFilename, outMime) = if (saveAsMp3)
+                            track.filename.replaceAfterLast('.', "mp3") to "audio/mpeg"
+                        else
+                            track.filename to track.mimeType
 
-                            val (outFilename, outMime) = if (saveAsMp3)
-                                track.filename.replaceAfterLast('.', "mp3") to "audio/mpeg"
-                            else
-                                track.filename to track.mimeType
+                        val existing = destDir.findFile(outFilename)
+                        val destFile = existing ?: destDir.createFile(outMime, outFilename)
+                            ?: throw Exception("Could not create file")
 
-                            val existing = destDir.findFile(outFilename)
-                            val destFile = existing ?: destDir.createFile(outMime, outFilename)
-                                ?: throw Exception("Could not create file")
-
-                            if (saveAsMp3) {
-                                val tmp = File(cacheDir, "transcode_${System.nanoTime()}.tmp")
-                                try {
-                                    tmp.outputStream().use { tmpOut ->
-                                        resp.body?.byteStream()?.use { it.copyTo(tmpOut) }
-                                            ?: throw Exception("Empty body")
-                                    }
-                                    contentResolver.openOutputStream(destFile.uri)?.use { out ->
-                                        Transcoder.toMp3(tmp, out)
-                                    } ?: throw Exception("Could not open output stream")
-                                } finally {
-                                    tmp.delete()
-                                }
-                            } else {
+                        if (saveAsMp3) {
+                            contentResolver.openOutputStream(destFile.uri)?.use { out ->
+                                Transcoder.toMp3(track.url, out)
+                            } ?: throw Exception("Could not open output stream")
+                        } else {
+                            val req = Request.Builder().url(track.url).build()
+                            httpClient.newCall(req).execute().use { resp ->
+                                if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
                                 contentResolver.openOutputStream(destFile.uri)?.use { out ->
                                     resp.body?.byteStream()?.use { it.copyTo(out) }
                                         ?: throw Exception("Empty body")
