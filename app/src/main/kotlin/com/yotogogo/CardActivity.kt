@@ -11,6 +11,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.yotogogo.databinding.ActivityCardBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -122,18 +124,20 @@ class CardActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val httpClient = OkHttpClient()
-            tracksToDownload.forEachIndexed { i, track ->
+            var doneCount = 0
+            var errorCount = 0
+
+            tracksToDownload.map { track ->
                 val globalIndex = currentTracks.indexOf(track)
-                if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.DOWNLOADING)
-                runCatching {
-                    withContext(Dispatchers.IO) {
+                trackAdapter?.updateStatus(globalIndex, DownloadStatus.DOWNLOADING)
+                async(Dispatchers.IO) {
+                    runCatching {
                         val (outFilename, outMime) = if (saveAsMp3)
                             track.filename.replaceAfterLast('.', "mp3") to "audio/mpeg"
                         else
                             track.filename to track.mimeType
 
-                        val existing = destDir.findFile(outFilename)
-                        val destFile = existing ?: destDir.createFile(outMime, outFilename)
+                        val destFile = destDir.createFile(outMime, outFilename)
                             ?: throw Exception("Could not create file")
 
                         if (saveAsMp3) {
@@ -150,16 +154,25 @@ class CardActivity : AppCompatActivity() {
                                 } ?: throw Exception("Could not open output stream")
                             }
                         }
+                    }.also { result ->
+                        withContext(Dispatchers.Main) {
+                            if (result.isSuccess) {
+                                doneCount++
+                                trackAdapter?.updateStatus(globalIndex, DownloadStatus.DONE)
+                            } else {
+                                errorCount++
+                                trackAdapter?.updateStatus(globalIndex, DownloadStatus.ERROR)
+                                binding.tvStatus.text = "Error: ${result.exceptionOrNull()?.message}"
+                            }
+                        }
                     }
-                }.onSuccess {
-                    if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.DONE)
-                }.onFailure { e ->
-                    if (globalIndex >= 0) trackAdapter?.updateStatus(globalIndex, DownloadStatus.ERROR)
-                    binding.tvStatus.text = "Error: ${e::class.simpleName}: ${e.message}"
                 }
+            }.awaitAll()
+
+            binding.tvStatus.text = buildString {
+                append("$doneCount/${tracksToDownload.size} tracks saved")
+                if (errorCount > 0) append(" ($errorCount errors)")
             }
-            val done = tracksToDownload.count { it.status == DownloadStatus.DONE }
-            binding.tvStatus.text = "$done/${tracksToDownload.size} tracks saved"
             binding.btnDownloadAll.isEnabled = true
         }
     }
