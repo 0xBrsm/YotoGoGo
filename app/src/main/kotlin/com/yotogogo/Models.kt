@@ -76,4 +76,4 @@ data class TrackItem(
     var status: DownloadStatus = DownloadStatus.PENDING
 )
 
-enum class DownloadStatus { PENDING, DOWNLOADING, DONE, ERROR }
+enum class DownloadStatus { PENDING, DOWNLOADING, TRANSCODING, DONE, ERROR }

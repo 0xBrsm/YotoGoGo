@@ -6,8 +6,10 @@ import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.yotogogo.databinding.ItemTrackBinding
 
-class TrackAdapter(private val items: List<TrackItem>) :
-    RecyclerView.Adapter<TrackAdapter.VH>() {
+class TrackAdapter(
+    private val items: List<TrackItem>,
+    private val onSelectionChanged: () -> Unit = {}
+) : RecyclerView.Adapter<TrackAdapter.VH>() {
 
     private val selected = BooleanArray(items.size) { true }
 
@@ -31,20 +33,23 @@ class TrackAdapter(private val items: List<TrackItem>) :
             holder.binding.imgTrackIcon.setImageResource(R.drawable.ic_music_note)
         }
         holder.binding.tvStatus.text = when (item.status) {
-            DownloadStatus.PENDING     -> ""
-            DownloadStatus.DOWNLOADING -> "⬇"
-            DownloadStatus.DONE        -> "✓"
-            DownloadStatus.ERROR       -> "✗"
+            DownloadStatus.PENDING      -> ""
+            DownloadStatus.DOWNLOADING  -> "⬇"
+            DownloadStatus.TRANSCODING  -> "⚙"
+            DownloadStatus.DONE         -> "✓"
+            DownloadStatus.ERROR        -> "✗"
         }
         holder.binding.root.setOnClickListener {
             selected[position] = !selected[position]
             notifyItemChanged(position)
+            onSelectionChanged()
         }
     }
 
     fun setAllSelected(all: Boolean) {
         selected.fill(all)
         notifyDataSetChanged()
+        onSelectionChanged()
     }
 
     fun allSelected() = selected.all { it }

@@ -39,7 +39,7 @@ class CardActivity : AppCompatActivity() {
             )
             saveTreeUri(uri)
             updateFolderLabel(uri)
-            startDownload(uri)
+            updateDownloadButton()
         }
     }
 
@@ -55,7 +55,7 @@ class CardActivity : AppCompatActivity() {
         binding.rvTracks.layoutManager = LinearLayoutManager(this)
         binding.btnBack.setOnClickListener { finish() }
         binding.btnChooseFolder.setOnClickListener { folderPicker.launch(savedTreeUri()) }
-        binding.btnDownloadAll.setOnClickListener { downloadAll() }
+        binding.btnDownloadAll.setOnClickListener { startDownload() }
         binding.cbSelectAll.setOnCheckedChangeListener { _, checked ->
             trackAdapter?.setAllSelected(checked)
         }
@@ -67,7 +67,6 @@ class CardActivity : AppCompatActivity() {
         }
 
         savedTreeUri()?.let { updateFolderLabel(it) }
-
         loadCard(slug)
     }
 
@@ -83,11 +82,11 @@ class CardActivity : AppCompatActivity() {
                     cardTitle = card.title ?: slug
                     binding.tvCardTitle.text = cardTitle
                     currentTracks = api.buildTrackList(card)
-                    trackAdapter = TrackAdapter(currentTracks)
+                    trackAdapter = TrackAdapter(currentTracks, ::updateDownloadButton)
                     binding.rvTracks.adapter = trackAdapter
                     binding.cbSelectAll.visibility = View.VISIBLE
                     binding.tvStatus.text = "${currentTracks.size} track(s)"
-                    binding.btnDownloadAll.isEnabled = currentTracks.isNotEmpty()
+                    updateDownloadButton()
                 }
                 .onFailure { e ->
                     binding.tvStatus.text = "Error: ${e.message}"
@@ -96,99 +95,111 @@ class CardActivity : AppCompatActivity() {
         }
     }
 
-    private fun downloadAll() {
-        val treeUri = savedTreeUri()
-        if (treeUri == null) folderPicker.launch(null) else startDownload(treeUri)
+    private fun updateDownloadButton() {
+        val hasFolder = savedTreeUri() != null
+        val hasSelection = trackAdapter?.getSelectedItems()?.isNotEmpty() == true
+        binding.btnDownloadAll.isEnabled = hasFolder && hasSelection
     }
 
-    private fun startDownload(treeUri: Uri) {
+    private fun startDownload() {
+        val treeUri = savedTreeUri() ?: return
         val tracksToDownload = trackAdapter?.getSelectedItems() ?: return
-        if (tracksToDownload.isEmpty()) {
-            binding.tvStatus.text = "No tracks selected"
-            return
-        }
+        if (tracksToDownload.isEmpty()) return
+
         binding.btnDownloadAll.isEnabled = false
         val safe = cardTitle.replace(Regex("[^A-Za-z0-9 _-]"), "").trim()
         val rootDir = DocumentFile.fromTreeUri(this, treeUri) ?: run {
             binding.tvStatus.text = "Error: cannot access selected folder"
-            binding.btnDownloadAll.isEnabled = true
+            updateDownloadButton()
             return
         }
         val yotoDir = rootDir.findFile("Yoto GoGo") ?: rootDir.createDirectory("Yoto GoGo")
         val destDir = yotoDir?.findFile(safe) ?: yotoDir?.createDirectory(safe)
         if (destDir == null) {
             binding.tvStatus.text = "Error: could not create destination folder"
-            binding.btnDownloadAll.isEnabled = true
+            updateDownloadButton()
             return
         }
-        binding.tvStatus.text = "Saving…"
 
         val saveAsMp3 = binding.switchMp3.isChecked
-
+        binding.tvStatus.text = "Downloading…"
         startService(Intent(this, DownloadService::class.java))
 
         lifecycleScope.launch {
             val httpClient = OkHttpClient()
-            val semaphore = Semaphore(4)
+            val transcodeSemaphore = Semaphore(8)
+            val transcodeJobs = mutableListOf<kotlinx.coroutines.Deferred<Unit>>()
             var doneCount = 0
             var errorCount = 0
 
-            tracksToDownload.map { track ->
+            // Sequential downloads
+            for (track in tracksToDownload) {
                 val globalIndex = currentTracks.indexOf(track)
                 trackAdapter?.updateStatus(globalIndex, DownloadStatus.DOWNLOADING)
-                async(Dispatchers.IO) {
-                    semaphore.withPermit {
+
+                val tmpResult = withContext(Dispatchers.IO) {
                     runCatching {
-                        val (outFilename, outMime) = if (saveAsMp3)
-                            track.filename.replaceAfterLast('.', "mp3") to "audio/mpeg"
-                        else
-                            track.filename to track.mimeType
-
-                        val destFile = destDir.createFile(outMime, outFilename)
-                            ?: throw Exception("Could not create file")
-
+                        val tmp = File(cacheDir, "dl_${System.nanoTime()}.tmp")
                         val req = Request.Builder().url(track.url).build()
                         httpClient.newCall(req).execute().use { resp ->
                             if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
-                            if (saveAsMp3) {
-                                val tmp = File(cacheDir, "dl_${Thread.currentThread().id}.tmp")
-                                try {
-                                    tmp.outputStream().use { resp.body?.byteStream()?.copyTo(it) ?: throw Exception("Empty body") }
-                                    contentResolver.openOutputStream(destFile.uri)?.use { out ->
-                                        Transcoder.toMp3(tmp, out)
-                                    } ?: throw Exception("Could not open output stream")
-                                } finally {
-                                    tmp.delete()
-                                }
-                            } else {
-                                contentResolver.openOutputStream(destFile.uri)?.use { out ->
-                                    resp.body?.byteStream()?.use { it.copyTo(out) }
-                                        ?: throw Exception("Empty body")
-                                } ?: throw Exception("Could not open output stream")
-                            }
+                            tmp.outputStream().use { resp.body?.byteStream()?.copyTo(it) ?: throw Exception("Empty body") }
                         }
-                    }.also { result ->
-                        withContext(Dispatchers.Main) {
-                            if (result.isSuccess) {
-                                doneCount++
-                                trackAdapter?.updateStatus(globalIndex, DownloadStatus.DONE)
-                            } else {
-                                errorCount++
-                                trackAdapter?.updateStatus(globalIndex, DownloadStatus.ERROR)
-                                binding.tvStatus.text = "Error: ${result.exceptionOrNull()?.message}"
+                        tmp
+                    }
+                }
+
+                if (tmpResult.isFailure) {
+                    errorCount++
+                    trackAdapter?.updateStatus(globalIndex, DownloadStatus.ERROR)
+                    binding.tvStatus.text = "Error: ${tmpResult.exceptionOrNull()?.message}"
+                    continue
+                }
+
+                val tmp = tmpResult.getOrThrow()
+                trackAdapter?.updateStatus(globalIndex, if (saveAsMp3) DownloadStatus.TRANSCODING else DownloadStatus.DOWNLOADING)
+
+                // Launch transcode/write in parallel, up to 8 concurrent
+                transcodeJobs += async(Dispatchers.IO) {
+                    transcodeSemaphore.withPermit {
+                        runCatching {
+                            val (outFilename, outMime) = if (saveAsMp3)
+                                track.filename.replaceAfterLast('.', "mp3") to "audio/mpeg"
+                            else
+                                track.filename to track.mimeType
+
+                            val destFile = destDir.createFile(outMime, outFilename)
+                                ?: throw Exception("Could not create file")
+
+                            contentResolver.openOutputStream(destFile.uri)?.use { out ->
+                                if (saveAsMp3) Transcoder.toMp3(tmp, out)
+                                else tmp.inputStream().use { it.copyTo(out) }
+                            } ?: throw Exception("Could not open output stream")
+                        }.also { result ->
+                            tmp.delete()
+                            withContext(Dispatchers.Main) {
+                                if (result.isSuccess) {
+                                    doneCount++
+                                    trackAdapter?.updateStatus(globalIndex, DownloadStatus.DONE)
+                                } else {
+                                    errorCount++
+                                    trackAdapter?.updateStatus(globalIndex, DownloadStatus.ERROR)
+                                    binding.tvStatus.text = "Error: ${result.exceptionOrNull()?.message}"
+                                }
                             }
                         }
                     }
-                    } // semaphore.withPermit
                 }
-            }.awaitAll()
+            }
+
+            transcodeJobs.awaitAll()
 
             stopService(Intent(this@CardActivity, DownloadService::class.java))
             binding.tvStatus.text = buildString {
                 append("$doneCount/${tracksToDownload.size} tracks saved")
                 if (errorCount > 0) append(" ($errorCount errors)")
             }
-            binding.btnDownloadAll.isEnabled = true
+            updateDownloadButton()
         }
     }
 
