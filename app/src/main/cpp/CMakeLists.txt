@@ -27,6 +27,7 @@ typedef float ieee754_float32_t;
 ]])
 
 set(LAME_SRC
+    ${lame_SOURCE_DIR}/libmp3lame/VbrTag.c
     ${lame_SOURCE_DIR}/libmp3lame/bitstream.c
     ${lame_SOURCE_DIR}/libmp3lame/encoder.c
     ${lame_SOURCE_DIR}/libmp3lame/fft.c
