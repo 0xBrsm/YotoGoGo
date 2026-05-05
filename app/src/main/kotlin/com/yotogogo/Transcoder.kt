@@ -61,7 +61,8 @@ object Transcoder {
                         outBuf.limit(info.offset + info.size)
                         val pcmBytes = ByteArray(info.size)
                         outBuf.get(pcmBytes)
-                        encoder.feed(pcmBytes.toShortArray(), buffered)
+                        val shorts = pcmBytes.toShortArray()
+                        encoder.feed(shorts, shorts.size / channels, buffered)
                     }
                     codec.releaseOutputBuffer(outIdx, false)
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) eos = true
