@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -122,8 +124,11 @@ class CardActivity : AppCompatActivity() {
 
         val saveAsMp3 = binding.switchMp3.isChecked
 
+        startService(Intent(this, DownloadService::class.java))
+
         lifecycleScope.launch {
             val httpClient = OkHttpClient()
+            val semaphore = Semaphore(4)
             var doneCount = 0
             var errorCount = 0
 
@@ -131,6 +136,7 @@ class CardActivity : AppCompatActivity() {
                 val globalIndex = currentTracks.indexOf(track)
                 trackAdapter?.updateStatus(globalIndex, DownloadStatus.DOWNLOADING)
                 async(Dispatchers.IO) {
+                    semaphore.withPermit {
                     runCatching {
                         val (outFilename, outMime) = if (saveAsMp3)
                             track.filename.replaceAfterLast('.', "mp3") to "audio/mpeg"
@@ -166,9 +172,11 @@ class CardActivity : AppCompatActivity() {
                             }
                         }
                     }
+                    } // semaphore.withPermit
                 }
             }.awaitAll()
 
+            stopService(Intent(this@CardActivity, DownloadService::class.java))
             binding.tvStatus.text = buildString {
                 append("$doneCount/${tracksToDownload.size} tracks saved")
                 if (errorCount > 0) append(" ($errorCount errors)")
