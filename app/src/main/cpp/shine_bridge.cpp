@@ -39,17 +39,17 @@ Java_com_yotogogo_Mp3Encoder_nativeCreate(JNIEnv*, jobject,
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_yotogogo_Mp3Encoder_nativeEncode(JNIEnv* env, jobject,
-                                           jlong handle, jshortArray pcm)
+                                           jlong handle, jshortArray pcm,
+                                           jint offset, jint length)
 {
     auto* w = reinterpret_cast<ShineWrapper*>(handle);
     if (!w) return nullptr;
 
-    jsize len = env->GetArrayLength(pcm);
     jshort* src = env->GetShortArrayElements(pcm, nullptr);
 
     int outBytes = 0;
     unsigned char* mp3 = shine_encode_buffer_interleaved(
-        w->enc, reinterpret_cast<int16_t*>(src), &outBytes);
+        w->enc, reinterpret_cast<int16_t*>(src + offset), &outBytes);
 
     env->ReleaseShortArrayElements(pcm, src, JNI_ABORT);
 
