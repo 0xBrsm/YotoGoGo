@@ -4,14 +4,15 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import java.io.BufferedOutputStream
+import java.io.File
 import java.io.OutputStream
 import java.nio.ByteOrder
 
 object Transcoder {
 
-    fun toMp3(url: String, output: OutputStream, bitrateKbps: Int = 128) {
+    fun toMp3(input: File, output: OutputStream, bitrateKbps: Int = 128) {
         val extractor = MediaExtractor()
-        extractor.setDataSource(url)
+        extractor.setDataSource(input.absolutePath)
 
         var trackIndex = -1
         var format: MediaFormat? = null
@@ -23,7 +24,7 @@ object Transcoder {
                 break
             }
         }
-        requireNotNull(format) { "No audio track found at $url" }
+        requireNotNull(format) { "No audio track found in $input" }
         extractor.selectTrack(trackIndex)
 
         val mime       = format.getString(MediaFormat.KEY_MIME)!!

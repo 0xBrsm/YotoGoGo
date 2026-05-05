@@ -19,6 +19,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 
 class CardActivity : AppCompatActivity() {
 
@@ -146,14 +147,20 @@ class CardActivity : AppCompatActivity() {
                         val destFile = destDir.createFile(outMime, outFilename)
                             ?: throw Exception("Could not create file")
 
-                        if (saveAsMp3) {
-                            contentResolver.openOutputStream(destFile.uri)?.use { out ->
-                                Transcoder.toMp3(track.url, out)
-                            } ?: throw Exception("Could not open output stream")
-                        } else {
-                            val req = Request.Builder().url(track.url).build()
-                            httpClient.newCall(req).execute().use { resp ->
-                                if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
+                        val req = Request.Builder().url(track.url).build()
+                        httpClient.newCall(req).execute().use { resp ->
+                            if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
+                            if (saveAsMp3) {
+                                val tmp = File(cacheDir, "dl_${Thread.currentThread().id}.tmp")
+                                try {
+                                    tmp.outputStream().use { resp.body?.byteStream()?.copyTo(it) ?: throw Exception("Empty body") }
+                                    contentResolver.openOutputStream(destFile.uri)?.use { out ->
+                                        Transcoder.toMp3(tmp, out)
+                                    } ?: throw Exception("Could not open output stream")
+                                } finally {
+                                    tmp.delete()
+                                }
+                            } else {
                                 contentResolver.openOutputStream(destFile.uri)?.use { out ->
                                     resp.body?.byteStream()?.use { it.copyTo(out) }
                                         ?: throw Exception("Empty body")
