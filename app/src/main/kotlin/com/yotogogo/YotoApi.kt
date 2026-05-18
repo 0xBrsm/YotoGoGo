@@ -21,6 +21,11 @@ class YotoApi {
 
     private val gson = Gson()
 
+    private class ApiException(
+        val statusCode: Int,
+        message: String
+    ) : Exception(message)
+
     companion object {
         const val CLIENT_ID   = "Ui8g0T3UR0CIsZJMhHpzouU8dfAm4ZEK"
         const val REDIRECT_URI = "com.yotogogo://callback"
@@ -76,22 +81,23 @@ class YotoApi {
                 ?: throw Exception("No access token in response: $json")
         }
 
-    suspend fun getCard(accessToken: String, cardSlug: String): YotoCard =
+    suspend fun getCard(accessToken: String, cardRef: String): YotoCard =
         withContext(Dispatchers.IO) {
-            val req = Request.Builder()
-                .url("$API_BASE/card/$cardSlug")
-                .header("Authorization", "Bearer $accessToken")
-                .header("User-Agent", USER_AGENT)
-                .get().build()
+            try {
+                fetchCard(accessToken, cardRef)
+            } catch (e: ApiException) {
+                if (e.statusCode != 404) throw e
 
-            val body = client.newCall(req).execute().use { resp ->
-                val text = resp.body?.string()
-                if (!resp.isSuccessful) throw Exception("Card fetch error ${resp.code}: $text")
-                text
-            } ?: throw Exception("Empty card response")
+                val resolvedCardId = getLibrary(accessToken)
+                    .firstOrNull { it.cardId == cardRef || it.slug == cardRef }
+                    ?.cardId
 
-            gson.fromJson(body, CardResponse::class.java).card
-                ?: throw Exception("No card in response")
+                if (resolvedCardId != null && resolvedCardId != cardRef) {
+                    fetchCard(accessToken, resolvedCardId)
+                } else {
+                    throw e
+                }
+            }
         }
 
     suspend fun getLibrary(accessToken: String): List<YotoCard> =
@@ -148,5 +154,30 @@ class YotoApi {
             }
         }
         return items
+    }
+
+    private fun fetchCard(accessToken: String, cardRef: String): YotoCard {
+        val url = Uri.parse(API_BASE).buildUpon()
+            .appendPath("card")
+            .appendPath(cardRef)
+            .build()
+            .toString()
+
+        val req = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .header("User-Agent", USER_AGENT)
+            .get().build()
+
+        val body = client.newCall(req).execute().use { resp ->
+            val text = resp.body?.string()
+            if (!resp.isSuccessful) {
+                throw ApiException(resp.code, "Card fetch error ${resp.code}: $text")
+            }
+            text
+        } ?: throw Exception("Empty card response")
+
+        return gson.fromJson(body, CardResponse::class.java).card
+            ?: throw Exception("No card in response")
     }
 }
