@@ -173,5 +173,4 @@ object Transcoder {
             AudioFormat.ENCODING_PCM_FLOAT -> "PCM_FLOAT"
             else -> "PCM($pcmEncoding)"
         }
-    }
 }
