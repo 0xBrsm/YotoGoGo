@@ -1,14 +1,19 @@
 package com.yotogogo
 
+import android.media.AudioFormat
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.util.Log
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.OutputStream
+import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.roundToInt
 
 object Transcoder {
+    private const val TAG = "Transcoder"
 
     fun toMp3(input: File, output: OutputStream, bitrateKbps: Int = 128) {
         val extractor = MediaExtractor()
@@ -27,61 +32,146 @@ object Transcoder {
         requireNotNull(format) { "No audio track found in $input" }
         extractor.selectTrack(trackIndex)
 
-        val mime       = format.getString(MediaFormat.KEY_MIME)!!
-        val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-        val channels   = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        val mime = format.getString(MediaFormat.KEY_MIME)!!
 
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
         codec.start()
 
-        val buffered = BufferedOutputStream(output, 65536)
-        Mp3Encoder(sampleRate, channels, bitrateKbps).use { encoder ->
-            val info = MediaCodec.BufferInfo()
-            var eos = false
+        try {
+            val buffered = BufferedOutputStream(output, 65536)
+            var pcmFormat: PcmFormat? = null
+            var encoder: Mp3Encoder? = null
+            try {
+                val info = MediaCodec.BufferInfo()
+                var eos = false
 
-            while (!eos) {
-                val inIdx = codec.dequeueInputBuffer(10_000L)
-                if (inIdx >= 0) {
-                    val inBuf = codec.getInputBuffer(inIdx)!!
-                    val sampleSize = extractor.readSampleData(inBuf, 0)
-                    if (sampleSize < 0) {
-                        codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                    } else {
-                        codec.queueInputBuffer(inIdx, 0, sampleSize, extractor.sampleTime, 0)
-                        extractor.advance()
+                while (!eos) {
+                    val inIdx = codec.dequeueInputBuffer(10_000L)
+                    if (inIdx >= 0) {
+                        val inBuf = codec.getInputBuffer(inIdx)!!
+                        val sampleSize = extractor.readSampleData(inBuf, 0)
+                        if (sampleSize < 0) {
+                            codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        } else {
+                            codec.queueInputBuffer(inIdx, 0, sampleSize, extractor.sampleTime, 0)
+                            extractor.advance()
+                        }
+                    }
+
+                    val outIdx = codec.dequeueOutputBuffer(info, 10_000L)
+                    when {
+                        outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                            val activeFormat = codec.outputFormat.toPcmFormat()
+                            pcmFormat = activeFormat
+                            Log.d(
+                                TAG,
+                                "Decoder output format for ${input.name}: " +
+                                    "${activeFormat.channels}ch @ ${activeFormat.sampleRate} Hz, " +
+                                    "${pcmEncodingName(activeFormat.pcmEncoding)}"
+                            )
+                        }
+
+                        outIdx >= 0 -> {
+                            val outBuf = codec.getOutputBuffer(outIdx)!!
+                            if (info.size > 0) {
+                                val activeFormat = pcmFormat ?: codec.outputFormat.toPcmFormat().also {
+                                    pcmFormat = it
+                                    Log.d(
+                                        TAG,
+                                        "Using decoder output format for ${input.name}: " +
+                                            "${it.channels}ch @ ${it.sampleRate} Hz, " +
+                                            "${pcmEncodingName(it.pcmEncoding)}"
+                                    )
+                                }
+                                val activeEncoder = encoder ?: Mp3Encoder(
+                                    activeFormat.sampleRate,
+                                    activeFormat.channels,
+                                    bitrateKbps
+                                ).also { encoder = it }
+                                val shorts = outBuf.toShortArray(info, activeFormat.pcmEncoding)
+                                activeEncoder.feed(shorts, shorts.size / activeFormat.channels, buffered)
+                            }
+                            codec.releaseOutputBuffer(outIdx, false)
+                            if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) eos = true
+                        }
                     }
                 }
 
-                val outIdx = codec.dequeueOutputBuffer(info, 10_000L)
-                if (outIdx >= 0) {
-                    val outBuf = codec.getOutputBuffer(outIdx)!!
-                    if (info.size > 0) {
-                        outBuf.position(info.offset)
-                        outBuf.limit(info.offset + info.size)
-                        val pcmBytes = ByteArray(info.size)
-                        outBuf.get(pcmBytes)
-                        val shorts = pcmBytes.toShortArray()
-                        encoder.feed(shorts, shorts.size / channels, buffered)
-                    }
-                    codec.releaseOutputBuffer(outIdx, false)
-                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) eos = true
+                val activeEncoder = requireNotNull(encoder) { "Decoder produced no PCM output for $input" }
+                activeEncoder.flush(buffered)
+            } finally {
+                encoder?.close()
+            }
+            buffered.flush()
+        } finally {
+            runCatching { codec.stop() }
+            codec.release()
+            extractor.release()
+        }
+    }
+
+    private data class PcmFormat(
+        val sampleRate: Int,
+        val channels: Int,
+        val pcmEncoding: Int,
+    )
+
+    private fun MediaFormat.toPcmFormat(): PcmFormat {
+        val sampleRate = getInteger(MediaFormat.KEY_SAMPLE_RATE)
+        val channels = getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        require(channels in 1..2) { "Unsupported channel count $channels" }
+
+        val pcmEncoding = if (containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+            getInteger(MediaFormat.KEY_PCM_ENCODING)
+        } else {
+            AudioFormat.ENCODING_PCM_16BIT
+        }
+        require(
+            pcmEncoding == AudioFormat.ENCODING_PCM_16BIT ||
+                pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT
+        ) {
+            "Unsupported PCM encoding ${pcmEncodingName(pcmEncoding)}"
+        }
+
+        return PcmFormat(
+            sampleRate = sampleRate,
+            channels = channels,
+            pcmEncoding = pcmEncoding,
+        )
+    }
+
+    private fun ByteBuffer.toShortArray(info: MediaCodec.BufferInfo, pcmEncoding: Int): ShortArray {
+        val data = duplicate()
+        data.position(info.offset)
+        data.limit(info.offset + info.size)
+        data.order(ByteOrder.nativeOrder())
+
+        return when (pcmEncoding) {
+            AudioFormat.ENCODING_PCM_16BIT -> {
+                val shorts = data.asShortBuffer()
+                ShortArray(shorts.remaining()).also { shorts.get(it) }
+            }
+
+            AudioFormat.ENCODING_PCM_FLOAT -> {
+                val floats = data.asFloatBuffer()
+                ShortArray(floats.remaining()) { index ->
+                    val sample = floats.get(index).coerceIn(-1f, 1f)
+                    (sample * Short.MAX_VALUE).roundToInt()
+                        .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                        .toShort()
                 }
             }
 
-            encoder.flush(buffered)
+            else -> error("Unsupported PCM encoding ${pcmEncodingName(pcmEncoding)}")
         }
-        buffered.flush()
-
-        codec.stop()
-        codec.release()
-        extractor.release()
     }
 
-    private fun ByteArray.toShortArray(): ShortArray {
-        val shorts = ShortArray(size / 2)
-        val buf = java.nio.ByteBuffer.wrap(this).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-        buf.get(shorts)
-        return shorts
+    private fun pcmEncodingName(pcmEncoding: Int): String =
+        when (pcmEncoding) {
+            AudioFormat.ENCODING_PCM_16BIT -> "PCM_16BIT"
+            AudioFormat.ENCODING_PCM_FLOAT -> "PCM_FLOAT"
+            else -> "PCM($pcmEncoding)"
+        }
     }
 }

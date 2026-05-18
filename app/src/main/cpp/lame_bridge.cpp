@@ -42,7 +42,13 @@ Java_com_yotogogo_Mp3Encoder_nativeEncode(JNIEnv* env, jobject,
     auto* mp3Buf = new unsigned char[mp3BufSize];
 
     jshort* src = env->GetShortArrayElements(pcm, nullptr);
-    int written = lame_encode_buffer_interleaved(gfp, src, numSamplesPerChannel, mp3Buf, mp3BufSize);
+    int channels = lame_get_num_channels(gfp);
+    int written = 0;
+    if (channels == 1) {
+        written = lame_encode_buffer(gfp, src, nullptr, numSamplesPerChannel, mp3Buf, mp3BufSize);
+    } else {
+        written = lame_encode_buffer_interleaved(gfp, src, numSamplesPerChannel, mp3Buf, mp3BufSize);
+    }
     env->ReleaseShortArrayElements(pcm, src, JNI_ABORT);
 
     jbyteArray result = nullptr;
